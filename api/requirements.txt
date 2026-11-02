@@ -1,0 +1,9 @@
+# Predavanje 1: web framework i razvojni server
+fastapi>=0.115
+uvicorn[standard]>=0.34
+
+# Konfiguracija .env
+pydantic-settings>=2.7
+
+# Formatiranje i provjera
+ruff>=0.9
