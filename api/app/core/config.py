@@ -10,9 +10,13 @@ class Settings(BaseSettings):
     APP_NAME: str = "One Piece TCG Collection API"
     ENV: str = "dev"
     DATABASE_URL: str
-    JWT_SECRET: str = "dev-only-placeholder"
 
-    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
+    JWT_SECRET: str
+    JWT_ISSUER: str = "optcg-collection"
 
+    model_config = SettingsConfigDict(
+        env_file=ENV_FILE,
+        extra="ignore"
+    )
 
 settings = Settings()
