@@ -11,3 +11,7 @@ alembic>=1.14
 
 # Testiranje modela
 pytest>=8.3
+
+# Predavanje 3 - Autentikacija
+bcrypt>=4.2
+PyJWT>=2.10

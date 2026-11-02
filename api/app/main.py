@@ -10,6 +10,7 @@ from app.core.errors import (
     validation_error_handler,
 )
 from app.core.logging import setup_logging
+from app.routers.auth import router as auth_router
 from app.routers.health import router as health_router
 
 
@@ -22,6 +23,7 @@ def create_app(config: Settings = settings) -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 
     app.include_router(health_router, prefix="/health", tags=["health"])
+    app.include_router(auth_router, prefix="/auth", tags=["auth"])
     return app
 
 
