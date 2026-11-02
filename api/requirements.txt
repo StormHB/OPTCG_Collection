@@ -1,9 +1,13 @@
-# Predavanje 1: web framework i razvojni server
+# Predavanje 1 - FastAPI i razvojni server
 fastapi>=0.115
 uvicorn[standard]>=0.34
-
-# Konfiguracija .env
 pydantic-settings>=2.7
-
-# Formatiranje i provjera
 ruff>=0.9
+
+# Predavanje 2 - ORM, PostgreSQL i migracije
+sqlalchemy[asyncio]>=2.0
+asyncpg>=0.30
+alembic>=1.14
+
+# Testiranje modela
+pytest>=8.3
