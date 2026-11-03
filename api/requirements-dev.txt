@@ -1,0 +1,4 @@
+# Instalacija: uv pip install -r requirements-dev.txt
+-r requirements.txt
+httpx>=0.27
+httpx2
