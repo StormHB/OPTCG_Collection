@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Cilj aplikacije je omogućiti pregled zajedničkog kataloga One Piece TCG karata, pretraživanje i filtriranje te vođenje **zasebne osobne kolekcije za svakog korisnika**. Projekt se razvija postupno, prema predavanjima, uz FastAPI, PostgreSQL, automatizirane testove i Git feature brancheve. Vue frontend slijedi u kasnijoj fazi.
 
-> **Stanje: 12. 11. 2026.** Implementirani su autentikacija, autorizacija, javni API kataloga, višestruki filteri, CSV uvoz, dopunjavanje metapodataka te **CRUD osobne kolekcije (Korak 8A)**. U lokalnoj bazi nalaze se **2.847 jedinstvenih karata i 3.111 izdanja**; podaci za **2.785 karata** dopunjeni su iz Koala Kollect snapshota. **Uvoz osobne kolekcije iz `.xlsx`, evidencija posudbi, potpun DON!! katalog i Vue frontend još nisu implementirani.**
+> **Stanje: 12. 11. 2026. — nakon Koraka 8B.** Implementirani su autentikacija, autorizacija, javni API kataloga, višestruki filteri, CSV uvoz, dopunjavanje metapodataka, **CRUD osobne kolekcije (8A)** i **uvoz osobnog Excela s pregledom prije upisa (8B)**. U lokalnoj bazi nalazi se **2.847 jedinstvenih karata i 3.111 izdanja**; metapodaci za **2.785 karata** dopunjeni su iz Koala Kollect snapshota. Korisnički Excel uspješno je pregledan i primijenjen; njegovo referentno stanje je **2.133 primjerka, 662 različita izdanja i 243 playseta prema Excelu**. **Posudbe, potpuni DON!! katalog i Vue frontend još nisu implementirani.**
 
 ## Razvoj po predavanjima
 
@@ -10,7 +10,7 @@ Studentski projekt za kolegij **Programiranje za web**. Cilj aplikacije je omogu
 - [x] **02 — Baza i migracije:** SQLAlchemy modeli, Alembic `001`, početni seed setova.
 - [x] **03 — Autentikacija:** Alembic `002`, bcrypt, JWT access/refresh, registracija i prijava.
 - [x] **04 — Autorizacija:** uloge `admin`/`user`, provjera vlasništva i zaštićene rute.
-- [ ] **05–06 — Katalog, CRUD i poslovna pravila (u tijeku):** migracija `003`, rječnici, M:N veze, javni API kataloga, filtriranje, CSV uvoz, obogaćivanje podataka i CRUD osobne kolekcije **odrađeni**; Excel import, posudbe i dio poslovnih pravila **preostaju**.
+- [ ] **05–06 — Katalog, CRUD i poslovna pravila (u tijeku):** migracija `003`, rječnici, M:N veze, API kataloga, filtriranje, CSV uvoz, dopuna metapodataka, CRUD kolekcije **(8A)** i Excel import **(8B) odrađeni**; posudbe, DON!! i dio poslovnih pravila **preostaju**.
 - [ ] **07–10 — Vue frontend:** vizualni katalog, pretraživanje, filteri, osobna kolekcija, Excel upload i posudbe.
 - [ ] **11–12 — Završno testiranje i objava:** end-to-end provjere, produkcijska konfiguracija i hosting.
 
@@ -21,9 +21,10 @@ Studentski projekt za kolegij **Programiranje za web**. Cilj aplikacije je omogu
 - **OR unutar kategorije, AND između kategorija**, pretraga bez razlikovanja velikih i malih slova te uklanjanje duplikata kod višestrukih podudaranja.
 - Zajednički katalog iz CSV-a te dopunjavanje karakteristika karata iz provjerenog Koala Kollect snapshota, bez mijenjanja korisničkih količina.
 - **Osobna kolekcija — Korak 8A:** dodavanje, pregled, djelomično uređivanje (`PATCH`) i brisanje zapisa za konkretno izdanje (`printing_id`); provjere pristupa, validacije i duplikata.
+- **Excel import — Korak 8B:** autorizirani `.xlsx` upload, `preview` bez upisa, kontrolirani `apply` s `plan_token`, načini `replace` i `add`, prepoznavanje izdanja, prijava grešaka i upozorenja prije uvoza.
 - Automatizirani testovi za katalog, filtriranje, ponovljivi uvoz, korisničke ovlasti i CRUD.
 
-**Ograničenja:** lokalni katalog još nije potpuno ažuran ni ujednačen za sve buduće setove i sve varijante ilustracija; **62 početne karte nisu obuhvaćene zadnjom dopunom**. Službena izdanja i vanjske identifikatore dodatno ćemo provjeravati. Količine iz korisničkog Excela **nisu uvezene**, premda je pojedinačni ručni unos preko API-ja implementiran.
+**Ograničenja:** lokalni katalog još nije potpuno ažuran ni ujednačen za sve buduće setove i sve varijante ilustracija; **62 početne karte nisu obuhvaćene zadnjom dopunom**. Službena izdanja i vanjske identifikatore dodatno ćemo provjeravati. Korisnički Excel uvezen je putem API-ja, ali **samostalan Vue ekran za upload**, **DON!! izdavanja** i **evidencija posudbi** još ne postoje. Broj playsetova iz Excela potrebno je zasebno usporediti s pravilima backend aplikacije.
 
 ## Tehnologije
 
@@ -32,6 +33,7 @@ Studentski projekt za kolegij **Programiranje za web**. Cilj aplikacije je omogu
 | Backend | Python, FastAPI, Pydantic, Uvicorn |
 | Baza | PostgreSQL 16, SQLAlchemy 2.0, Alembic, Docker Compose |
 | Sigurnost | bcrypt; JWT access i refresh tokeni |
+| Excel upload | openpyxl, python-multipart |
 | Testiranje i kvaliteta | pytest, Ruff, Swagger UI |
 | Verzije koda | Git, GitHub, feature branchevi, Pull Requestovi |
 | Frontend (planirano) | Vue 3, Vite, TypeScript |
@@ -48,9 +50,9 @@ OPTCG_Collection/
 │   │   ├── core/              # Konfiguracija, JWT, sigurnost i ovisnosti
 │   │   ├── models/            # SQLAlchemy modeli i M:N veze
 │   │   ├── repositories/      # Upiti nad bazom
-│   │   ├── routers/           # HTTP rute
+│   │   ├── routers/           # HTTP rute, uključujući collection_import.py
 │   │   ├── schemas/           # Pydantic sheme
-│   │   ├── services/          # Poslovna pravila i provjere pristupa
+│   │   ├── services/          # Poslovna pravila, uključujući collection_excel_import.py
 │   │   ├── main.py            # FastAPI aplikacija
 │   │   ├── seed.py            # Početni setovi i rječnici
 │   │   ├── import_catalog.py  # Početni uvoz CSV kataloga
@@ -67,7 +69,7 @@ OPTCG_Collection/
 └── README.md
 ```
 
-Mape `data/koala_snapshot/` (preuzeti podaci), `backups/` (dumpovi baze), `.env` i lokalni virtualni okoliš **ne smiju se commitati**. Provjeriti da su odgovarajuće putanje u `.gitignore`.
+Mape `data/koala_snapshot/` (preuzeti podaci), `backups/` (dumpovi baze), `.env`, osobni `.xlsx` dokumenti i lokalni virtualni okoliš **ne smiju se commitati**. Provjeriti `.gitignore` i staged datoteke prije svakog commita.
 
 ## Baza podataka
 
@@ -170,6 +172,8 @@ Zaustavljanje Uvicorna: `Ctrl+C`. Zaustavljanje PostgreSQL-a iz korijena projekt
 | `POST` | `/collections/{user_id}/entries` | Dodavanje izdanja u kolekciju | Vlasnik |
 | `PATCH` | `/collections/{user_id}/entries/{printing_id}` | Izmjena količine i/ili napomene | Vlasnik |
 | `DELETE` | `/collections/{user_id}/entries/{printing_id}` | Uklanjanje izdanja iz kolekcije | Vlasnik |
+| `POST` | `/collections/{user_id}/import/preview` | Validacija Excel datoteke i pregled promjena bez upisa | Vlasnik |
+| `POST` | `/collections/{user_id}/import/apply` | Potvrda pregledanog Excel uvoza | Vlasnik |
 
 ### Filtriranje kataloga
 
@@ -229,7 +233,65 @@ Content-Type: application/json
 
 Potvrđena ponašanja: `201` nakon dodavanja, `200` kod čitanja i izmjene, `409` pri pokušaju dodavanja istog izdanja drugi put, `204` pri brisanju i `404` pri ponovnom brisanju istog zapisa. Nevaljane i negativne količine odbijaju se validacijom; pristup tuđim kolekcijama je zabranjen. Količina `0` dopuštena je, ali ne predstavlja playset.
 
-**Nije još implementirano:** web-upload Excel datoteke, grupni unos količina ni upravljanje posudbama.
+**Nije još implementirano:** Vue sučelje za upload i upravljanje posudbama. Excel upload već postoji putem FastAPI/Swagger endpointova.
+
+### Uvoz osobne kolekcije iz Excela — Korak 8B
+
+Podržan je `.xlsx` upload putem Swaggera i autentificiranog API-ja. Uvoz **ne mijenja** zajednički katalog karata, nego samo `collection_entries` **prijavljenog vlasnika**. Nije potrebna nova Alembic migracija. Koriste se `openpyxl` i `python-multipart` (u `api/requirements.txt`).
+
+**Endpointovi:**
+
+```http
+POST /collections/{user_id}/import/preview?mode=replace
+POST /collections/{user_id}/import/apply?mode=replace&plan_token=...
+```
+
+Za oba poziva potrebno je autorizirati se JWT access tokenom i priložiti `.xlsx` pod multipart poljem `file`. Maksimalna dopuštena veličina je **6 MB**.
+
+**Načini rada:**
+
+| Način | Ponašanje |
+| --- | --- |
+| `replace` | Postavlja količinu za **izdanja navedena u Excelu**; ne briše ostale zapise. Prazna napomena ne briše postojeću. |
+| `add` | Dodaje količinu iz Excela na postojeću; ne mijenja postojeće napomene. Ponovljena potvrda novog plana može ponovno povećati količine. |
+
+**Pregled i primjena:**
+
+1. Pozovi `preview` s Excelom i odabranim `mode`. **Ne mijenja bazu**.
+2. Provjeri `matched`, `create`, `update`, `unchanged`, `error_count`, `warning_count`, `can_apply`, `issues` i `samples`.
+3. Kada je `can_apply=true` i sve odgovara očekivanjima, napravi sigurnosnu kopiju baze po potrebi.
+4. Pozovi `apply` s **istom datotekom, korisnikom i načinom rada**, koristeći `plan_token` iz prethodnog odgovora.
+5. Ako se datoteka ili relevantno stanje kolekcije promijeni između pregleda i potvrde, primjena se odbija s `409`; potreban je novi pregled. Neispravni redci blokiraju uvoz (`422`).
+
+`plan_token` je **kontrolna vrijednost plana uvoza**, a **nije JWT access token**. JWT se koristi u Swaggerovu `Authorize` dijelu.
+
+**Mapiranje izdanja:** regularna izdanja traže se prema kombinaciji **sheet + broj karte + izdanje**, čime npr. `OP01-016` iz `OP01` ostaje različit od PRB reprinta. Sheet `PREGLED` preskače se. Za `VARIJANTE` i budući `DON` sheet potreban je **točan `ID izdanja`**, inače se ne radi nesigurno automatsko uparivanje. Retci s napomenom, ali bez količine, preskaču se uz upozorenje.
+
+**Naš stvarni pregled i uvoz (12. 11. 2026.):**
+
+| Provjera | Rezultat |
+| --- | ---: |
+| Pročitanih sheetova | 63 |
+| Redaka s količinom | 662 |
+| Prepoznatih izdanja | 662/662 |
+| Novih zapisa planiranih prije uvoza | 662 |
+| Grešaka | 0 |
+| Upozorenja | 2 |
+
+Upozorenja: **OP15** — jedna napomena bez količine; **OP18** — 119 napomena bez količine. Primjena u načinu `replace` potvrđena je kao uspješna. Prema korisničkom Excelu referentno stanje kolekcije iznosi **2.133 primjerka**, **662 različita izdanja** i **243 playseta**; potpunu potvrdu ukupnih količina i računanje playsetova prema pravilima aplikacije provjeravamo SQL upitom i zasebnom statistikom.
+
+U TablePlusu:
+
+```sql
+SELECT user_id,
+       COUNT(*) AS razlicitih_izdanja,
+       COALESCE(SUM(quantity), 0) AS ukupno_primjeraka
+FROM collection_entries
+GROUP BY user_id
+ORDER BY user_id;
+```
+
+Osobnu Excel datoteku **ne spremamo na GitHub** i ne dodajemo u zajednički kataloški CSV. Upload s web-stranice kroz Vue predviđen je u kasnijoj fazi; API već radi.
 
 ## Uvoz podataka
 
@@ -307,9 +369,13 @@ python -m ruff format --check .
 alembic current
 ```
 
-Nakon Koraka 7 potvrđeno je **85 prolaznih automatiziranih testova**. U Koraku 8A novi testovi CRUD-a također su prošli, kao i ručne Swagger provjere; **ukupan broj sadašnjih testova treba očitati iz zadnjeg lokalnog `pytest` ispisa**, a ne prepisivati staru brojku.
+Poslije Koraka 7 potvrđeno je **85 prolaznih automatiziranih testova**. Korak 8A prošao je dodatne CRUD testove i Swagger provjere, a za Korak 8B u pripremi su prošla **22 nova izolirana testa**; stvarni Excel preview i apply također su potvrđeni. **Puni lokalni `pytest tests -q` treba ponovno pokrenuti prije commita 8B** i koristiti njegov stvarni rezultat umjesto zbrajanja testova napamet.
 
-Testiramo uspješne i neuspješne scenarije (401/403/404/409/422), pristup samo vlastitoj kolekciji, paginaciju, OR/AND filtere, ponovljeni uvoz i djelomični PATCH. Pri većim izmjenama baze provjeravamo i Alembic te SQL podatke u TablePlusu.
+Testiramo uspješne i neuspješne scenarije (401/403/404/409/422), pristup samo vlastitoj kolekciji, paginaciju, OR/AND filtere, ponovljivi CSV i metadata uvoz, djelomični PATCH, Excel preview/apply i odbijanje zastarjelog plana. Za poslovna pravila provjeravamo **HTTP status + jasnu poruku/stabilan kod greške** te da odbijeni zahtjevi ne mijenjaju stanje baze. Isti status smije pokrivati više smisleno povezanih grešaka. Pri većim izmjenama baze provjeravamo i Alembic te SQL podatke u TablePlusu.
+
+### Datumi i vremenske zone — pravilo za nove funkcionalnosti
+
+Za datumsko-vremenska polja koja moraju nositi vremensku zonu koristimo **`AwareDatetime`** (Pydantic). Na backendu radimo s **timezone-aware** vrijednostima, normaliziramo ih na **UTC** (`datetime.now(timezone.utc)` i `.astimezone(timezone.utc)` kada ulaz ima vremensku zonu), a u Vueu ih prikazujemo u lokalnoj vremenskoj zoni korisnika. Ne koristimo naivne datume ni `datetime.utcnow()`. Ovo je projektni standard za buduće posudbe i rokove, a **ne tvrdnja da je već uvedeno u sve stare modele**.
 
 ## Sigurnost, privatnost i autorska prava
 
@@ -330,10 +396,6 @@ Testiramo uspješne i neuspješne scenarije (401/403/404/409/422), pristup samo 
 | Character, Event, Stage i ostale | `quantity >= 4` |
 
 Pragovi su implementirani u pomoćnoj funkciji; zeleni prikaz i statistike u Vue sučelju tek su planirani. **Označavamo samo ispunjene playsetove.** Količina `0` ili `3` na običnoj karti ne zadovoljava prag.
-
-### Excel import osobnih kolekcija — Korak 8B (sljedeće)
-
-Planirano je čitanje `.xlsx` datoteke s više sheetova, prepoznavanje kartičnog koda i **točnog izdanja**, količine i napomene, prikaz nepoznatih/dupliciranih zapisa prije potvrde te odabir načina unosa: **zamijeni postojeće količine** ili **dodaj na postojeće**. Uvoz će se odnositi isključivo na prijavljenog korisnika. Nakon implementacije moći ćemo prenijeti i postojeću osobnu Excel kolekciju.
 
 ### DON!! katalog
 
@@ -364,19 +426,18 @@ git add README.md
 
 git diff --cached --stat
 git diff --cached --check
-git commit -m "feat: implement personal collection CRUD"
+git commit -m "feat: add validated Excel import for personal collections"
 git push
 ```
 
-Za **Korak 8A**, nakon provjere testova i sadržaja `git status`, stageati treba i sve stvarno promijenjene Python datoteke te testove, ne samo README. Ako branch još nema upstream, prvi put koristiti `git push -u origin feat/catalog-enrichment`, a nakon toga `git push`.
+Za **Korak 8B**, osim README-a treba dodati i stvarno izmijenjene datoteke, osobito `api/app/routers/collections.py`, `api/app/routers/collection_import.py`, `api/app/services/collection_excel_import.py`, `api/tests/test_collection_excel_import.py`, `api/requirements.txt` i `docs/KORAK_08B_EXCEL_IMPORT.md`. Prije commita provjeriti da staged promjene ne uključuju osobnu Excel datoteku, `.env`, backup ili snapshot. Na već povezanom branchu `feat/catalog-enrichment` dovoljan je obični `git push`.
 
 ## Sljedeći koraci
 
-1. **Zatvoriti Korak 8A:** ovaj README, provjera staged datoteka, commit i push na `feat/catalog-enrichment`.
-2. **Korak 8B:** implementirati siguran Excel import količina i napomena za prijavljenog korisnika.
-3. **Uvoz osobne kolekcije:** provjeriti mapiranje izdanja i uvesti postojeći osobni workbook.
-4. **Posudbe:** migracija `004`, CRUD i poslovna pravila za izdavanje/vraćanje.
-5. **Nastavak kataloga:** provjera nepokrivenih/novih kartičnih podataka, varijanti i DON!! izdanja.
-6. **Vue i objava:** vizualni katalog, filteri, kolekcije, posudbe, testiranje i produkcijska priprema.
+1. **Zatvoriti Korak 8B:** pokrenuti puni `pytest`, provjeriti import i README, pregledati staged datoteke te napraviti commit i push na `feat/catalog-enrichment`.
+2. **Provjera statistike kolekcije:** usporediti SQL zbroj količina s Excelom i izračunati playsetove po pravilima (Leader ≥1, DON!! ≥10, ostali ≥4).
+3. **Posudbe — Korak 9:** migracija `004`, tablica `card_loans`, API s poslovnim pravilima za posuđivanje i djelomično/potpuno vraćanje, odgovarajući statusi i poruke; UTC/AwareDatetime.
+4. **Nastavak kataloga:** provjera nepokrivenih/novih kartičnih podataka, varijanti i DON!! izdanja.
+5. **Vue i objava:** vizualni katalog, filteri, Excel upload, kolekcije, posudbe, testiranje i produkcijska priprema.
 
 Prioritet su funkcionalnosti potrebne za studentski projekt i sigurnost korisničkih podataka; potpunost kataloga i podršku za nova izdanja možemo nadograđivati postupno.

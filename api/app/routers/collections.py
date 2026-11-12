@@ -70,3 +70,9 @@ async def delete_collection_entry(
     """Ukloni zapis iz svoje kolekcije, bez brisanja karte iz kataloga."""
     await collection_service.delete_collection_entry(db, current_user, user_id, printing_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# Unutar već registriranog /collections routera: bez promjene app/main.py.
+from app.routers.collection_import import router as collection_import_router
+
+router.include_router(collection_import_router)
