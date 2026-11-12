@@ -14,7 +14,7 @@ from app.routers.collections import router as collections_router
 from app.routers.admin import router as admin_router
 from app.routers.auth import router as auth_router
 from app.routers.health import router as health_router
-
+from app.routers.cards import router as cards_router
 
 def create_app(config: Settings = settings) -> FastAPI:
     setup_logging(debug=config.ENV == "dev")
@@ -38,6 +38,8 @@ def create_app(config: Settings = settings) -> FastAPI:
         prefix="/admin",
         tags=["admin"]
     )
+
+    app.include_router(cards_router, prefix="/cards", tags=["cards"])
 
     return app
 
