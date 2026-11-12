@@ -1,11 +1,15 @@
-"""HTTP rute za korisničku kolekciju (predavanje 4)."""
+"""Privatni API za pregled i uređivanje osobne kolekcije."""
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
-from app.schemas.collection import CollectionEntryResponse
+from app.schemas.collection import (
+    CollectionEntryCreate,
+    CollectionEntryResponse,
+    CollectionEntryUpdate,
+)
 from app.services import collection_service
 
 router = APIRouter()
@@ -19,3 +23,50 @@ async def get_collection(
 ):
     """Dohvati korisnikove zapise, ali samo ako je prijavljen kao vlasnik."""
     return await collection_service.get_user_collection(db, current_user, user_id)
+
+
+@router.post(
+    "/{user_id}/entries",
+    response_model=CollectionEntryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_collection_entry(
+    body: CollectionEntryCreate,
+    user_id: int = Path(ge=1),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Dodaj fizičko izdanje u vlastitu kolekciju."""
+    return await collection_service.add_collection_entry(db, current_user, user_id, body)
+
+
+@router.patch(
+    "/{user_id}/entries/{printing_id}",
+    response_model=CollectionEntryResponse,
+)
+async def update_collection_entry(
+    body: CollectionEntryUpdate,
+    user_id: int = Path(ge=1),
+    printing_id: int = Path(ge=1),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Ažuriraj quantity i/ili note jednog izdanja."""
+    return await collection_service.update_collection_entry(
+        db, current_user, user_id, printing_id, body
+    )
+
+
+@router.delete(
+    "/{user_id}/entries/{printing_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_collection_entry(
+    user_id: int = Path(ge=1),
+    printing_id: int = Path(ge=1),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Ukloni zapis iz svoje kolekcije, bez brisanja karte iz kataloga."""
+    await collection_service.delete_collection_entry(db, current_user, user_id, printing_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
