@@ -21,3 +21,9 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+#Data
+data/koala_snapshot/
+
+# Local PostgreSQL backups
+backups/

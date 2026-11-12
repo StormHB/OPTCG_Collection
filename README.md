@@ -294,6 +294,34 @@ Logika pragova postoji u pomoćnoj funkciji; **prikaz zelenom bojom i statistika
 - Uvesti **osobnu Excel kolekciju** tek nakon što postoje autentificirani unos količina i pouzdano mapiranje na `printing_id`.
 - U Vue sučelju ponuditi searchable multi-select dropdownove, koji se sužavaju već tijekom tipkanja, te filtre za **owned / missing / playset**.
 
+### Dopunjavanje kataloga (Korak 7)
+
+Katalog je dopunjen podacima iz Koala Kollect snapshota
+od 22.10.2026. Dopunjuju se tip karte, Cost, Power,
+Counter, Life, Attribute, Archetype, Keywords, Effect
+i Block oznake kada su podaci dostupni.
+
+U bazi je 2847 karata. Uvoznik je prepoznao i obradio
+2785 karata s aktivnim engleskim opisima.
+
+Preuzimanje i provjera podataka:
+
+python -m app.enrich_catalog --download
+
+Pregled promjena bez upisa:
+
+python -m app.enrich_catalog
+
+Primjena promjena:
+
+python -m app.enrich_catalog --apply
+
+Ponovljeni uvoz ne stvara duplikate.
+Korisničke količine, napomene i postojeća izdanja
+ostaju nepromijenjeni.
+
+Provjera: 85 uspješnih automatiziranih testova.
+
 ### Posudbe (`card_loans`, planirano)
 
 Jedna nova tablica `card_loans` s dva smjera: **posuđeno drugima** i **posuđeno od drugih**. Za svaku posudbu čuvat ćemo korisnika, `printing_id`, osobu, količinu, vraćenu količinu, datum i neobaveznu napomenu/rok vraćanja.
