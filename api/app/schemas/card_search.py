@@ -20,6 +20,9 @@ class CardSearchFilters:
     rarities: tuple[str, ...] = ()
     variants: tuple[str, ...] = ()  # Izvorni variant_code, npr. "regular", "alt".
     search: str | None = None
+    # Korak 10B: statusi su OR unutar kategorije; korisnik dolazi samo iz JWT-a.
+    collection_statuses: tuple[str, ...] = ()
+    collection_user_id: int | None = None
 
     def is_active(self) -> bool:
         """Ne mijenjamo ponašanje i mockove starog GET /cards bez filtera."""
@@ -38,5 +41,6 @@ class CardSearchFilters:
                 self.rarities,
                 self.variants,
                 self.search and self.search.strip(),
+                self.collection_statuses,
             )
         )

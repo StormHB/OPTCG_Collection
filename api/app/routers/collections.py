@@ -10,7 +10,8 @@ from app.schemas.collection import (
     CollectionEntryResponse,
     CollectionEntryUpdate,
 )
-from app.services import collection_service
+from app.schemas.collection_stats import CollectionStatsResponse
+from app.services import collection_service, collection_stats_service
 
 router = APIRouter()
 
@@ -23,6 +24,22 @@ async def get_collection(
 ):
     """Dohvati korisnikove zapise, ali samo ako je prijavljen kao vlasnik."""
     return await collection_service.get_user_collection(db, current_user, user_id)
+
+
+@router.get(
+    "/{user_id}/stats",
+    response_model=CollectionStatsResponse,
+    tags=["collection-stats"],
+)
+async def get_collection_stats(
+    user_id: int = Path(ge=1),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Ukupne količine, broj različitih izdanja i dovršeni playsetovi."""
+    return await collection_stats_service.get_collection_stats(
+        db, current_user, user_id
+    )
 
 
 @router.post(
