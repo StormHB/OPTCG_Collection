@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje: 12. 11. 2026. — Korak 9B.** Rade autentikacija, katalog, filteri, osobne kolekcije i Excel import. Evidencija posudbi sada ima model, migraciju `004` i API za dodavanje, pregled te djelomično/potpuno vraćanje (provjeriti testove nakon instalacije paketa).
+> **Stanje: 13. 11. 2026. — pripremljen Korak 10A.** Katalog, autentikacija, Excel import, osobne kolekcije i sustav posudbi (9A/9B) završeni su i spojeni u `main`. U Koraku 10A dodan je read-only API za statistiku osobne kolekcije. Novi endpoint i puni testni skup treba provjeriti na lokalnoj bazi prije commita.
 
 ## Napredak
 
@@ -15,7 +15,9 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 08A | CRUD osobne kolekcije | ✅ |
 | 08B | Excel import (`preview` / `apply`) | ✅ |
 | 09A | Model posudbi i migracija `004` | ✅ |
-| 09B | API posudbi, dostupnost i djelomična vraćanja | ✅ nakon provjere |
+| 09B | API posudbi, dostupnost i djelomična vraćanja | ✅ 180 testova i ručne provjere |
+| 10A | Statistika kolekcije i playsetova (read-only API) | Pripremljeno; lokalna provjera |
+| 10B | Filteri `owned`, `missing`, `playset` | Sljedeće |
 | Dalje | DON!!/varijante, Vue frontend, završno testiranje i objava | Planirano |
 
 ## Tehnologije
@@ -92,6 +94,7 @@ Za popis ruta i primjere zahtjeva koristi Swagger. Trenutačno su implementirane
 | `GET` | `/admin/users` | Administratorski pregled |
 | `GET` | `/cards`, `/cards/filters`, `/cards/{id}` | Katalog, filteri i detalji |
 | `GET` | `/collections/{user_id}` | Osobna kolekcija |
+| `GET` | `/collections/{user_id}/stats` | Statistika: ukupno, različita izdanja, playsetovi |
 | `POST` | `/collections/{user_id}/entries` | Dodavanje izdanja |
 | `PATCH` | `/collections/{user_id}/entries/{printing_id}` | Djelomična izmjena |
 | `DELETE` | `/collections/{user_id}/entries/{printing_id}` | Brisanje |
@@ -130,6 +133,19 @@ Načini uvoza:
 Za uparivanje se koriste sheet, broj karte i konkretno izdanje. Nejasne varijante i DON!! ne povezuju se nasumično. Retci s napomenom bez količine preskaču se uz upozorenje. Promijenjena datoteka ili relevantno stanje kolekcije između pregleda i potvrde uzrokuje odbijanje plana.
 
 Detaljnije u: `docs/KORAK_08B_EXCEL_IMPORT.md`.
+
+### Statistika kolekcije — Korak 10A
+
+`GET /collections/{user_id}/stats` dostupan je **isključivo vlasniku** kolekcije uz JWT access token; admin nema automatski pravo pristupa tuđoj statistici. Endpoint je samo za čitanje i ne zahtijeva novu migraciju (`004` ostaje `head`). Odgovor sadrži:
+
+- `total_cards`: zbroj pozitivnih količina iz `collection_entries`.
+- `distinct_printings`: broj različitih **fizičkih izdanja** (`printing_id`) s količinom većom od nule; reprint je zasebno izdanje.
+- `playsets`: broj izdanja koja su dosegla prag (najviše **jedan playset po izdanju**, čak i uz osam kopija iste obične karte).
+- `playsets_by_type`: podjela playsetova na `leader`, `don` i `other` radi lakše provjere.
+
+Pragovi: **Leader ≥1, DON!! ≥10, ostali ≥4**. Ako metapodatak `card_type` nedostaje, Leader se prepoznaje i po rijetkosti `L`, a DON!! po tipu, oznaci seta `DON` ili kodu koji počinje `DON-`. Količine `0` ne povećavaju nijednu statistiku. Posudbe (`lent` ili `borrowed`) **ne mijenjaju vlasničku statistiku**.
+
+Detaljne provjere, SQL upit i testni scenariji: `docs/KORAK_10A_STATISTIKA_KOLEKCIJE.md`.
 
 ## Podaci kataloga i kolekcije
 
@@ -171,7 +187,7 @@ Prije većeg upisa preporučuje se sigurnosna kopija baze. Privatne Excel datote
 
 ## Poslovna pravila i sljedeći koraci
 
-**Playset** (planirani prikaz i statistika):
+**Playset** (izračun implementiran u 10A; vizualni prikaz i filteri slijede u 10B/Vue):
 
 | Vrsta | Prag |
 | --- | ---: |
@@ -181,11 +197,11 @@ Prije većeg upisa preporučuje se sigurnosna kopija baze. Privatne Excel datote
 
 **Korak 9B — API posudbi:** omogućeni su pregled, unos i djelomični/potpuni povrat. Ne može se posuditi više vlastitih primjeraka nego što je raspoloživo; aktivne posudbe štite od smanjivanja količine kroz PATCH, brisanje ili Excel `replace`. Posudba **ne mijenja vlasničku količinu** u `collection_entries`; tuđe posuđene karte **ne povećavaju vlastite playsetove**. Odgovori uključuju točan `printing_id`, kod, set i URL ilustracije za budući Vue prikaz. Dokumentacija: `docs/KORAK_09B_API_POSUDBI.md`.
 
-**Dalje:** Vue sučelje za posudbe i statistiku, provjera DON!! i alternativnih izdanja te završno testiranje i objava.
+**Dalje — Korak 10B:** filteri osobne kolekcije `owned`, `missing` i `playset` (po točnom izdanju, bez miješanja s tuđim posudbama). Nakon toga DON!!/alternativna izdanja i Vue sučelje.
 
 Za nove datumsko-vremenske API podatke koristimo Pydantic `AwareDatetime`, normalizaciju na UTC (`datetime.now(timezone.utc)` i `.astimezone(timezone.utc)`), a lokalnu zonu samo za prikaz.
 
-Nakon posudbi slijede dopuna DON!!/varijanti, Vue frontend (katalog, filteri, kolekcija, Excel upload i kompaktna lista posudbi) te završno testiranje i objava. Za javno prikazivanje Bandai ilustracija i tekstova potrebno je prethodno provjeriti prava korištenja.
+U kasnijim koracima slijede dopuna DON!!/varijanti, Vue frontend (katalog, filteri, kolekcija, Excel upload i kompaktna lista posudbi) te završno testiranje i objava. Za javno prikazivanje Bandai ilustracija i tekstova potrebno je prethodno provjeriti prava korištenja.
 
 ## Testiranje i Git
 
@@ -197,8 +213,8 @@ python -m ruff format --check .
 alembic current
 ```
 
-Na kraju svakog testiranog koraka ažuriramo dokumentaciju te radimo **commit i push**. Pull Request u `main` radimo po završetku funkcionalne cjeline. Nakon spajanja kataloga u `main` razvoj posudbi vodi se na branchu `feat/card-loans`.
+Na kraju svakog testiranog koraka ažuriramo dokumentaciju te radimo **commit i push**. Pull Request u `main` radimo po završetku funkcionalne cjeline. Korak 10A razvija se na zasebnom branchu `feat/collection-stats`, nastalom nakon mergea `feat/card-loans` u `main`.
 
 Prije commita provjeriti `git status`, `git diff --cached --stat` i `git diff --cached --check`; nikad ne commitati `.env`, tajne, osobne `.xlsx`, `backups/`, preuzete snapshotove ni `.venv/`.
 
-Detaljna dokumentacija modela posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md`.
+Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI.md`. Korak 10A: `docs/KORAK_10A_STATISTIKA_KOLEKCIJE.md`.
