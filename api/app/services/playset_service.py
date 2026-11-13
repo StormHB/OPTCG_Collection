@@ -52,3 +52,28 @@ def playset_threshold(
 def is_playset(card_type: str, quantity: int) -> bool:
     """Zadržana stara signatura kako postojeći testovi ostaju kompatibilni."""
     return quantity >= playset_threshold(card_type)
+
+
+def playset_threshold_sql(card_type, *, rarity, set_code, card_code):
+    """SQL pandan playset_threshold() za filtriranje bez učitavanja cijelog kataloga.
+
+    Oba izračuna moraju slijediti iste pragove i fallback redoslijed.
+    Izrazi su SQLAlchemy stupci, kompatibilni s PostgreSQL-om i SQLiteom.
+    """
+    from sqlalchemy import case, func, or_
+
+    def normalize(value):
+        return func.lower(func.trim(func.coalesce(value, "")))
+
+    kind = normalize(card_type)
+    rare = normalize(rarity)
+    product = normalize(set_code)
+    code = normalize(card_code)
+    is_leader = or_(kind == "leader", rare.in_(("l", "leader")))
+    is_don = or_(
+        kind.in_(("don", "don!!", "don!!!")),
+        rare.in_(("don", "don!!", "don!!!")),
+        product == "don",
+        code.like("don-%"),
+    )
+    return case((is_leader, 1), (is_don, 10), else_=4)

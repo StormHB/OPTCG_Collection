@@ -4,15 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
 from app.repositories import card_repo
-from app.schemas.card_search import CardSearchFilters
 from app.schemas.card import (
     CardDetailResponse,
     CardFilterOptionsResponse,
-    CardSetFilterOption,
     CardPageResponse,
     CardPrintingResponse,
+    CardSetFilterOption,
     CardSummaryResponse,
 )
+from app.schemas.card_search import CardSearchFilters
 
 
 async def get_cards(
@@ -23,6 +23,18 @@ async def get_cards(
     filters: CardSearchFilters | None = None,
 ) -> CardPageResponse:
     """Dohvati stranicu i pripremi javni odgovor bez ORM objekata."""
+    # Odgovoran je i servis, ne samo HTTP ruta: nema privatnog upita
+    # bez autentificiranog vlasničkog identiteta.
+    if (
+        filters is not None
+        and filters.collection_statuses
+        and filters.collection_user_id is None
+    ):
+        raise AppError(
+            "invalid_credentials",
+            "Za osobne filtere potreban je access token",
+            401,
+        )
     if filters is not None and filters.is_active():
         cards, total = await card_repo.list_filtered(
             db, limit=limit, offset=offset, filters=filters
@@ -57,7 +69,10 @@ async def get_card_detail(db: AsyncSession, *, card_id: int) -> CardDetailRespon
         keywords=sorted(k.name for k in card.keywords),
         printings=[
             CardPrintingResponse.model_validate(p)
-            for p in sorted(card.printings, key=lambda p: (p.product_set_id, p.variant_code, p.id))
+            for p in sorted(
+                card.printings,
+                key=lambda p: (p.product_set_id, p.variant_code, p.id),
+            )
         ],
     )
 

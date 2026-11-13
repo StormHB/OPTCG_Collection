@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje: 13. 11. 2026. — pripremljen Korak 10A.** Katalog, autentikacija, Excel import, osobne kolekcije i sustav posudbi (9A/9B) završeni su i spojeni u `main`. U Koraku 10A dodan je read-only API za statistiku osobne kolekcije. Novi endpoint i puni testni skup treba provjeriti na lokalnoj bazi prije commita.
+> **Stanje: 13. 11. 2026. — Korak 10B u provjeri.** Autentikacija, katalog, Excel import i posudbe završeni su; Korak 10A potvrđen je na stvarnoj kolekciji (2.133 primjerka, 662 izdanja, 285 playsetova). Korak 10B dodaje osobne filtere na javni katalog. Nakon lokalnih testova, Swagger provjere, commita i pusha slijedi PR za `feat/collection-stats`.
 
 ## Napredak
 
@@ -16,8 +16,8 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 08B | Excel import (`preview` / `apply`) | ✅ |
 | 09A | Model posudbi i migracija `004` | ✅ |
 | 09B | API posudbi, dostupnost i djelomična vraćanja | ✅ 180 testova i ručne provjere |
-| 10A | Statistika kolekcije i playsetova (read-only API) | Pripremljeno; lokalna provjera |
-| 10B | Filteri `owned`, `missing`, `playset` | Sljedeće |
+| 10A | Statistika kolekcije i playsetova (read-only API) | ✅ SQL i Swagger provjereni |
+| 10B | Filteri `owned`, `missing`, `playset` | Implementirano; testovi i Swagger na lokalnom projektu prije commita |
 | Dalje | DON!!/varijante, Vue frontend, završno testiranje i objava | Planirano |
 
 ## Tehnologije
@@ -115,6 +115,31 @@ GET /cards?colors=red&colors=yellow&sets=op01&limit=20&offset=0
 
 Dostupni su filteri za boju, tip, cijenu, snagu, atribut, counter, blok, keyword, archetype, set, rijetkost i varijantu. Izdanje/set/rarity/variant/block moraju se podudarati na istom printingu. `counter_values=none` označava odsutnu tiskanu Counter vrijednost, ne broj `0` ili keyword `[Counter]`.
 
+**Alias za oznake setova (10B):** filter `sets` i tekstualna pretraga `search` prihvaćaju `OP01` i `OP-01` (uključujući `op01`, `op-01` i rubne razmake). Isto vrijedi za `EB`, `ST` i `PRB` (`EB-03` = `EB03`). Baza ostaje u kanonskom formatu bez dodatne crtice, a puni kod karte poput `OP01-016` ostaje nepromijenjen.
+
+### Osobni filteri u katalogu — Korak 10B
+
+Postojeći `GET /cards` podržava ponovljeni query parametar `collection_status`:
+
+| Vrijednost | Značenje |
+| --- | --- |
+| `owned` | Karta ima barem jedno **pozitivno** vlasničko izdanje koje odgovara odabranim filterima izdanja. |
+| `missing` | Karta ima odgovarajuće izdanje, ali **nijedno takvo izdanje** nema pozitivnu vlasničku količinu. |
+| `playset` | Barem jedno odgovarajuće izdanje doseže prag: Leader ≥1, DON!! ≥10, ostali ≥4. |
+
+```http
+GET /cards?collection_status=owned&search=OP01-016
+GET /cards?collection_status=missing&sets=OP01
+GET /cards?collection_status=playset&colors=Red&sets=OP01
+GET /cards?collection_status=missing&collection_status=playset&limit=20
+```
+
+**Sigurnost:** bez osobnog filtera `GET /cards` ostaje javan. Osobni filter zahtijeva valjan JWT access token (Swagger `Authorize`) i uvijek koristi **isključivo korisnika iz JWT-a**, nikada proizvoljni `user_id` iz URL-a. Više `collection_status` vrijednosti je **OR**; kombinacija s bojama, setovima i ostalim kategorijama je **AND**. Za set, rarity, variant i block osobni status mora odgovarati **istom fizičkom izdanju**, uključujući reprintove.
+
+**Razlika u brojkama:** `GET /cards` vraća **osnovne karte** (`cards`) bez duplikata, a `/collections/{user_id}/stats` broji **izdanja** (`printing_id`). Zato `total` za `collection_status=playset` **ne mora biti 285** čak ni kad je statistika 285, ako više dovršenih izdanja pripada istoj karti. Posudbe se ne računaju u vlasničke količine.
+
+Detalji i ručni testovi: `docs/KORAK_10B_FILTERI_KOLEKCIJE.md`.
+
 **CRUD kolekcije:** zapis pripada konkretnom `printing_id`. `PATCH` mijenja samo izričito poslana polja (`{"quantity": 4}` ne mijenja napomenu; `{"note": null}` briše napomenu). Nije moguće kreirati duplikat istog izdanja za istog korisnika.
 
 ### Excel import — Korak 8B
@@ -157,9 +182,10 @@ Detaljne provjere, SQL upit i testni scenariji: `docs/KORAK_10A_STATISTIKA_KOLEK
 | --- | ---: |
 | Ukupno primjeraka | **2.133** |
 | Različitih izdanja | **662** |
-| Playsetova prema Excelu | **243** |
+| Playsetova prema Excelu (staro pravilo ≥4 za sve) | **243** |
+| Playsetova prema backendu (Leader ≥1, DON!! ≥10, ostali ≥4) | **285** |
 
-Excel preview je prepoznao svih 662 unosa bez grešaka; upozorenja su se odnosila na napomene bez količine (OP15 i OP18). `apply` s `mode=replace` uspješno je proveden. **Broj playsetova još nije zasebno potvrđen backend izračunom.**
+Excel preview je prepoznao svih 662 unosa bez grešaka; upozorenja su se odnosila na napomene bez količine (OP15 i OP18). `apply` s `mode=replace` uspješno je proveden. **Backend je kasnije potvrdio 285 playsetova prema pravilima aplikacije: 44 Leader, 0 DON!!, 241 ostalih.** Excelovih 243 potječe od starijeg praga ≥4 za sve vrste karata.
 
 Provjera količina u PostgreSQL-u:
 
@@ -187,7 +213,7 @@ Prije većeg upisa preporučuje se sigurnosna kopija baze. Privatne Excel datote
 
 ## Poslovna pravila i sljedeći koraci
 
-**Playset** (izračun implementiran u 10A; vizualni prikaz i filteri slijede u 10B/Vue):
+**Playset** (izračun implementiran u 10A, API filtri u 10B; vizualni prikaz planiran u Vueu):
 
 | Vrsta | Prag |
 | --- | ---: |
@@ -197,7 +223,7 @@ Prije većeg upisa preporučuje se sigurnosna kopija baze. Privatne Excel datote
 
 **Korak 9B — API posudbi:** omogućeni su pregled, unos i djelomični/potpuni povrat. Ne može se posuditi više vlastitih primjeraka nego što je raspoloživo; aktivne posudbe štite od smanjivanja količine kroz PATCH, brisanje ili Excel `replace`. Posudba **ne mijenja vlasničku količinu** u `collection_entries`; tuđe posuđene karte **ne povećavaju vlastite playsetove**. Odgovori uključuju točan `printing_id`, kod, set i URL ilustracije za budući Vue prikaz. Dokumentacija: `docs/KORAK_09B_API_POSUDBI.md`.
 
-**Dalje — Korak 10B:** filteri osobne kolekcije `owned`, `missing` i `playset` (po točnom izdanju, bez miješanja s tuđim posudbama). Nakon toga DON!!/alternativna izdanja i Vue sučelje.
+**Dalje:** lokalna provjera 10B, commit/push i PR `feat/collection-stats` → `main`; zatim DON!!/alternativna izdanja i Vue sučelje.
 
 Za nove datumsko-vremenske API podatke koristimo Pydantic `AwareDatetime`, normalizaciju na UTC (`datetime.now(timezone.utc)` i `.astimezone(timezone.utc)`), a lokalnu zonu samo za prikaz.
 
@@ -213,8 +239,8 @@ python -m ruff format --check .
 alembic current
 ```
 
-Na kraju svakog testiranog koraka ažuriramo dokumentaciju te radimo **commit i push**. Pull Request u `main` radimo po završetku funkcionalne cjeline. Korak 10A razvija se na zasebnom branchu `feat/collection-stats`, nastalom nakon mergea `feat/card-loans` u `main`.
+Na kraju svakog testiranog koraka ažuriramo dokumentaciju te radimo **commit i push**. Pull Request u `main` radimo po završetku funkcionalne cjeline. Koraci 10A i 10B razvijaju se na branchu `feat/collection-stats`, nastalom nakon mergea `feat/card-loans` u `main`.
 
 Prije commita provjeriti `git status`, `git diff --cached --stat` i `git diff --cached --check`; nikad ne commitati `.env`, tajne, osobne `.xlsx`, `backups/`, preuzete snapshotove ni `.venv/`.
 
-Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI.md`. Korak 10A: `docs/KORAK_10A_STATISTIKA_KOLEKCIJE.md`.
+Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI.md`. Korak 10A: `docs/KORAK_10A_STATISTIKA_KOLEKCIJE.md`. Korak 10B: `docs/KORAK_10B_FILTERI_KOLEKCIJE.md`.
