@@ -7,7 +7,7 @@ def test_required_tables_exist() -> None:
         "users", "card_sets", "cards", "card_printings", "collection_entries",
         "colors", "attributes", "archetypes", "keywords",
         "card_colors", "card_attributes", "card_archetypes", "card_keywords",
-        "printing_external_ids",
+        "printing_external_ids", "card_loans",
     }
     assert set(Base.metadata.tables) == expected
 
