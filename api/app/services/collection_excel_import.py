@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from openpyxl import load_workbook
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from app.models.card import Card
 from app.models.card_printing import CardPrinting
 from app.models.card_set import CardSet
 from app.models.collection_entry import CollectionEntry
+from app.models.card_loan import CardLoan
 
 ImportMode = Literal["replace", "add"]
 MAX_UPLOAD_BYTES = 6 * 1024 * 1024
@@ -345,6 +346,14 @@ async def build_plan(
     existing = {entry.printing_id: entry for entry in
                 (await db.scalars(select(CollectionEntry).where(CollectionEntry.user_id == user_id))).all()}
 
+    # Aktivne odlazne posudbe ne smiju biti izgubljene Excel replace uvozom.
+    loaned_rows = (await db.execute(
+        select(CardLoan.printing_id, func.sum(CardLoan.quantity - CardLoan.quantity_returned))
+        .where(CardLoan.user_id == user_id, CardLoan.direction == "lent")
+        .group_by(CardLoan.printing_id)
+    )).all()
+    loaned_by_printing = {pid: int(qty) for pid, qty in loaned_rows}
+
     issues = list(parsed.issues)
     changes = []
     seen_ids: set[int] = set()
@@ -384,6 +393,12 @@ async def build_plan(
         before = current.quantity if current is not None else None
         before_note = current.note if current is not None else None
         after = row.quantity if mode == "replace" else (before or 0) + row.quantity
+        if after < loaned_by_printing.get(printing.printing_id, 0):
+            issues.append(ImportIssue(
+                row.sheet, row.row, "active_loans_exceed_owned",
+                "Kolicina u Excelu manja je od jos posudenih primjeraka"
+            ))
+            continue
         if after > MAX_IMPORT_QUANTITY:
             issues.append(ImportIssue(row.sheet, row.row, "quantity_overflow",
                                       "Nakon zbrajanja količina prelazi 999999"))
@@ -414,6 +429,43 @@ async def apply_plan(db: AsyncSession, plan: ImportPlan, expected_token: str) ->
     if plan.token != expected_token:
         raise AppError("stale_import_preview",
                        "Datoteka, način uvoza ili kolekcija promijenili su se nakon previewa", 409)
+    # Serijaliziraj Excel apply s kreiranjem novih posudbi.
+    # Zakljucaj sve postojece retke u deterministickom poretku, jednim upitom.
+    changes_to_write = [c for c in plan.changes if c.action in {"create", "update"}]
+    existing_ids = sorted(c.printing_id for c in changes_to_write if c.before_quantity is not None)
+    locked_entries = {} if not existing_ids else {
+        entry.printing_id: entry for entry in (await db.scalars(
+            select(CollectionEntry).where(
+                CollectionEntry.user_id == plan.user_id,
+                CollectionEntry.printing_id.in_(existing_ids),
+            ).order_by(CollectionEntry.printing_id).with_for_update()
+            .execution_options(populate_existing=True)
+        )).all()
+    }
+    for change in changes_to_write:
+        if change.before_quantity is not None:
+            current = locked_entries.get(change.printing_id)
+            if (current is None or current.quantity != change.before_quantity
+                    or current.note != change.before_note):
+                raise AppError("stale_import_preview", "Kolekcija se promijenila", 409)
+
+    # Posudbe mogu nastati nakon previewa. Provjera opet pod istim lockom.
+    changed_ids = [c.printing_id for c in changes_to_write]
+    active_rows = [] if not changed_ids else (await db.execute(
+        select(CardLoan.printing_id,
+               func.sum(CardLoan.quantity - CardLoan.quantity_returned))
+        .where(CardLoan.user_id == plan.user_id, CardLoan.direction == "lent",
+               CardLoan.printing_id.in_(changed_ids))
+        .group_by(CardLoan.printing_id)
+    )).all()
+    active_by_printing = {pid: int(qty) for pid, qty in active_rows}
+    for change in changes_to_write:
+        if change.after_quantity < active_by_printing.get(change.printing_id, 0):
+            raise AppError(
+                "active_loans_exceed_owned",
+                "Excel uvoz bi smanjio kolicinu ispod broja aktivnih posudbi",
+                409,
+            )
     for change in plan.changes:
         if change.action in {"unchanged", "skip_zero"}:
             continue

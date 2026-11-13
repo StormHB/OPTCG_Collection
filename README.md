@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje: 12. 11. 2026. — završen Korak 9A.** Rade autentikacija, katalog, filteri, osobne kolekcije i Excel import. Za posudbe su napravljeni **model `CardLoan` i migracija `004`**; API za posudbe slijedi u Koraku 9B.
+> **Stanje: 12. 11. 2026. — Korak 9B.** Rade autentikacija, katalog, filteri, osobne kolekcije i Excel import. Evidencija posudbi sada ima model, migraciju `004` i API za dodavanje, pregled te djelomično/potpuno vraćanje (provjeriti testove nakon instalacije paketa).
 
 ## Napredak
 
@@ -15,7 +15,7 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 08A | CRUD osobne kolekcije | ✅ |
 | 08B | Excel import (`preview` / `apply`) | ✅ |
 | 09A | Model posudbi i migracija `004` | ✅ |
-| 09B | API posudbi, dostupnost i djelomična vraćanja | Sljedeće |
+| 09B | API posudbi, dostupnost i djelomična vraćanja | ✅ nakon provjere |
 | Dalje | DON!!/varijante, Vue frontend, završno testiranje i objava | Planirano |
 
 ## Tehnologije
@@ -69,7 +69,7 @@ Zaustavljanje: `Ctrl+C` za Uvicorn; iz korijena projekta `docker compose stop` z
 | `colors`, `attributes`, `archetypes`, `keywords` | Rječnici vrijednosti filtera |
 | `card_colors`, `card_attributes`, `card_archetypes`, `card_keywords` | M:N veze karata i rječnika |
 | `printing_external_ids` | Vanjski identifikatori izdanja |
-| `card_loans` | Evidencija posudbi (trenutačno model i tablica, bez API-ja) |
+| `card_loans` | Posudbe po korisniku i točnom izdanju; aktivne i vraćene količine |
 
 Migracije:
 
@@ -78,7 +78,7 @@ Migracije:
 - `003` — rječnici, M:N veze, vanjski identifikatori i dodatna polja kataloga
 - `004` — `card_loans` (primijenjena)
 
-`card_loans` sadrži vlasnika evidencije (`user_id`), točno izdanje (`printing_id`), smjer `lent`/`borrowed`, osobu, početnu i vraćenu količinu, datume i napomenu. Baza provjerava pozitivan broj posuđenih karata, dozvoljen smjer i da vraćena količina ne prelazi početnu. Datumi su tipa `timestamp with time zone`. **Posudbe zasad nemaju API; to je Korak 9B.**
+`card_loans` sadrži vlasnika evidencije (`user_id`), točno izdanje (`printing_id`), smjer `lent`/`borrowed`, osobu, početnu i vraćenu količinu, datume i napomenu. Baza provjerava pozitivan broj posuđenih karata, dozvoljen smjer i da vraćena količina ne prelazi početnu. Datumi su tipa `timestamp with time zone`. API koristi `AwareDatetime`, a sve datume na backendu normalizira na UTC.
 
 ## API
 
@@ -97,6 +97,10 @@ Za popis ruta i primjere zahtjeva koristi Swagger. Trenutačno su implementirane
 | `DELETE` | `/collections/{user_id}/entries/{printing_id}` | Brisanje |
 | `POST` | `/collections/{user_id}/import/preview` | Provjera Excela bez upisa |
 | `POST` | `/collections/{user_id}/import/apply` | Potvrda pregledanog uvoza |
+| `GET` | `/collections/{user_id}/loans` | Posudbe, s filterima `direction` i `active_only` |
+| `POST` | `/collections/{user_id}/loans` | Nova posudba (`lent` / `borrowed`) |
+| `GET` | `/collections/{user_id}/loans/{loan_id}` | Detalji posudbe |
+| `POST` | `/collections/{user_id}/loans/{loan_id}/returns` | Djelomično ili potpuno vraćanje |
 
 **Autorizacija:** osobnu kolekciju može čitati i mijenjati njezin vlasnik; administratorska uloga sama po sebi ne dopušta uređivanje tuđe kolekcije. Za zaštićene rute koristi se JWT access token.
 
@@ -175,7 +179,9 @@ Prije većeg upisa preporučuje se sigurnosna kopija baze. Privatne Excel datote
 | DON!! | `quantity >= 10` |
 | Ostale karte | `quantity >= 4` |
 
-**Korak 9B — API posudbi:** evidentirati posuđeno drugima i od drugih, dopustiti djelomična/potpuna vraćanja i zabraniti posudbu više vlastitih primjeraka nego što je raspoloživo. Posudba **ne mijenja vlasničku količinu** u `collection_entries`; tuđe posuđene karte **ne povećavaju vlastite playsetove**.
+**Korak 9B — API posudbi:** omogućeni su pregled, unos i djelomični/potpuni povrat. Ne može se posuditi više vlastitih primjeraka nego što je raspoloživo; aktivne posudbe štite od smanjivanja količine kroz PATCH, brisanje ili Excel `replace`. Posudba **ne mijenja vlasničku količinu** u `collection_entries`; tuđe posuđene karte **ne povećavaju vlastite playsetove**. Odgovori uključuju točan `printing_id`, kod, set i URL ilustracije za budući Vue prikaz. Dokumentacija: `docs/KORAK_09B_API_POSUDBI.md`.
+
+**Dalje:** Vue sučelje za posudbe i statistiku, provjera DON!! i alternativnih izdanja te završno testiranje i objava.
 
 Za nove datumsko-vremenske API podatke koristimo Pydantic `AwareDatetime`, normalizaciju na UTC (`datetime.now(timezone.utc)` i `.astimezone(timezone.utc)`), a lokalnu zonu samo za prikaz.
 

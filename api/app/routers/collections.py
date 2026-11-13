@@ -76,3 +76,8 @@ async def delete_collection_entry(
 from app.routers.collection_import import router as collection_import_router
 
 router.include_router(collection_import_router)
+
+# Korak 9B: posudbe su dodatni privatni endpointovi istog /collections routera.
+from app.routers.card_loans import router as card_loans_router
+
+router.include_router(card_loans_router)
