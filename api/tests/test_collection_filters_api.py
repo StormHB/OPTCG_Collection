@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.deps import get_db
-from app.core.optional_auth import get_collection_filter_user
 from app.core.errors import AppError, app_error_handler, validation_error_handler
+from app.core.optional_auth import get_collection_filter_user
 from app.models import Base
 from app.models.card import Card
 from app.models.card_metadata import Color
@@ -64,14 +64,20 @@ def seeded_db():
 
         def card(id_, code, name, base_set, kind=None, color=None):
             return Card(
-                id=id_, code=code, name=name, original_set=base_set,
-                card_type=kind, colors=[color] if color else [],
+                id=id_,
+                code=code,
+                name=name,
+                original_set=base_set,
+                card_type=kind,
+                colors=[color] if color else [],
             )
 
         def printing(card_, product_set, variant="regular", rarity="R"):
             p = CardPrinting(
-                card=card_, product_set=product_set,
-                variant_code=variant, rarity=rarity,
+                card=card_,
+                product_set=product_set,
+                variant_code=variant,
+                rarity=rarity,
             )
             session.add(p)
             session.flush()
@@ -142,8 +148,10 @@ def make_client(db, user_id=7):
 
     app.dependency_overrides[get_db] = fake_db
     if user_id is not None:
+
         async def fake_user():
             return SimpleNamespace(id=user_id, role="user", is_active=True)
+
         app.dependency_overrides[get_collection_filter_user] = fake_user
     return TestClient(app)
 
@@ -151,23 +159,28 @@ def make_client(db, user_id=7):
 def test_owned_positive_quantity_only_and_other_user_hidden(seeded_db):
     codes, total = do_search(seeded_db)
     assert codes == [
-        "DON-001", "DON-002", "OP01-001", "OP01-004",
-        "OP02-001", "OP02-002", "OP02-003", "OP02-004",
+        "DON-001",
+        "DON-002",
+        "OP01-001",
+        "OP01-004",
+        "OP02-001",
+        "OP02-002",
+        "OP02-003",
+        "OP02-004",
     ]
     assert total == 8
     assert "OP01-003" not in codes  # postoji samo kod usera 8
 
 
 def test_missing_means_no_positive_owned_printing(seeded_db):
-    assert do_search(seeded_db, statuses=("missing",)) == (
-        ["OP01-003", "OP01-005"], 2
-    )
+    assert do_search(seeded_db, statuses=("missing",)) == (["OP01-003", "OP01-005"], 2)
     assert do_search(seeded_db, user_id=8, statuses=("missing",))[1] == 9
 
 
 def test_playset_matches_10a_rules_including_leader_rarity_and_don(seeded_db):
     assert do_search(seeded_db, statuses=("playset",)) == (
-        ["DON-002", "OP01-001", "OP01-004", "OP02-001", "OP02-004"], 5
+        ["DON-002", "OP01-001", "OP01-004", "OP02-001", "OP02-004"],
+        5,
     )
     # 9 DON! nema playset, 2 + 2 različitih ilustracija ne zbraja se.
     assert "DON-001" not in do_search(seeded_db, statuses=("playset",))[0]
@@ -176,20 +189,25 @@ def test_playset_matches_10a_rules_including_leader_rarity_and_don(seeded_db):
 
 def test_printing_filters_use_same_printing_as_personal_status(seeded_db):
     assert do_search(seeded_db, statuses=("owned",), sets=("PRB01",)) == (
-        ["OP01-004"], 1
+        ["OP01-004"],
+        1,
     )
     assert do_search(seeded_db, statuses=("missing",), sets=("OP01",)) == (
-        ["OP01-003", "OP01-004", "OP01-005"], 3
+        ["OP01-003", "OP01-004", "OP01-005"],
+        3,
     )
     assert do_search(seeded_db, statuses=("playset",), sets=("OP01",)) == (
-        ["OP01-001"], 1
+        ["OP01-001"],
+        1,
     )
     assert do_search(seeded_db, statuses=("playset",), sets=("PRB01",)) == (
-        ["OP01-004"], 1
+        ["OP01-004"],
+        1,
     )
     assert do_search(seeded_db, statuses=("playset",), rarities=("SR",)) == ([], 0)
     assert do_search(seeded_db, statuses=("playset",), rarities=("R",)) == (
-        ["OP01-001", "OP01-004"], 2
+        ["OP01-001", "OP01-004"],
+        2,
     )
     assert do_search(
         seeded_db, statuses=("playset",), sets=("PRB01",), variants=("alt",)
@@ -200,20 +218,24 @@ def test_status_or_between_values_and_and_with_other_filters(seeded_db):
     assert do_search(seeded_db, statuses=("owned", "missing"))[1] == 10
     assert do_search(seeded_db, statuses=("playset", "missing")) == (
         [
-            "DON-002", "OP01-001", "OP01-003", "OP01-004",
-            "OP01-005", "OP02-001", "OP02-004",
+            "DON-002",
+            "OP01-001",
+            "OP01-003",
+            "OP01-004",
+            "OP01-005",
+            "OP02-001",
+            "OP02-004",
         ],
         7,
     )
     assert do_search(seeded_db, statuses=("owned", "playset"))[1] == 8
     assert do_search(seeded_db, statuses=("playset",), colors=("Red",)) == (
-        ["OP01-001", "OP01-004", "OP02-001"], 3
+        ["OP01-001", "OP01-004", "OP02-001"],
+        3,
     )
     assert do_search(
         seeded_db, statuses=("missing",), colors=("Blue",), sets=("OP01",)
-    ) == (
-        ["OP01-003"], 1
-    )
+    ) == (["OP01-003"], 1)
 
 
 def test_pagination_after_personal_filter_no_duplicates(seeded_db):
@@ -286,13 +308,15 @@ def test_private_status_user_id_is_not_user_controlled(seeded_db):
 
 def test_filter_does_not_change_collection_or_loans(seeded_db):
     before = list(
-        seeded_db.session.query(CollectionEntry.id, CollectionEntry.quantity)
-        .order_by(CollectionEntry.id)
+        seeded_db.session.query(CollectionEntry.id, CollectionEntry.quantity).order_by(
+            CollectionEntry.id
+        )
     )
     make_client(seeded_db).get("/cards?collection_status=playset")
     after = list(
-        seeded_db.session.query(CollectionEntry.id, CollectionEntry.quantity)
-        .order_by(CollectionEntry.id)
+        seeded_db.session.query(CollectionEntry.id, CollectionEntry.quantity).order_by(
+            CollectionEntry.id
+        )
     )
     assert before == after
 
@@ -301,7 +325,9 @@ def test_service_rejects_filter_without_authenticated_identity(seeded_db):
     with pytest.raises(AppError) as ex:
         asyncio.run(
             card_service.get_cards(
-                seeded_db, limit=20, offset=0,
+                seeded_db,
+                limit=20,
+                offset=0,
                 filters=CardSearchFilters(collection_statuses=("owned",)),
             )
         )
@@ -312,17 +338,17 @@ def test_service_rejects_filter_without_authenticated_identity(seeded_db):
 # Korak 10B: ulazne oznake seta mogu imati crticu, dok baza čuva OP01.
 @pytest.mark.parametrize("alias", ["OP01", "op01", "OP-01", "op-01", " Op-01 "])
 def test_set_code_alias_owned_same_as_canonical(seeded_db, alias):
-    assert do_search(seeded_db, sets=(alias,)) == do_search(
-        seeded_db, sets=("OP01",)
-    )
+    assert do_search(seeded_db, sets=(alias,)) == do_search(seeded_db, sets=("OP01",))
 
 
 def test_set_alias_respects_same_printing_and_missing(seeded_db):
     assert do_search(seeded_db, statuses=("owned",), sets=("op-01",)) == (
-        ["OP01-001"], 1
+        ["OP01-001"],
+        1,
     )
     assert do_search(seeded_db, statuses=("missing",), sets=("OP-01",)) == (
-        ["OP01-003", "OP01-004", "OP01-005"], 3
+        ["OP01-003", "OP01-004", "OP01-005"],
+        3,
     )
 
 

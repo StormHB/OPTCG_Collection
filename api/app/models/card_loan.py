@@ -29,13 +29,17 @@ class CardLoan(Base):
 
     __tablename__ = "card_loans"
     __table_args__ = (
-        CheckConstraint("direction IN ('lent', 'borrowed')", name="ck_card_loans_direction"),
+        CheckConstraint(
+            "direction IN ('lent', 'borrowed')", name="ck_card_loans_direction"
+        ),
         CheckConstraint("quantity > 0", name="ck_card_loans_quantity_positive"),
         CheckConstraint(
             "quantity_returned >= 0 AND quantity_returned <= quantity",
             name="ck_card_loans_returned_range",
         ),
-        CheckConstraint("length(trim(person_name)) > 0", name="ck_card_loans_person_nonblank"),
+        CheckConstraint(
+            "length(trim(person_name)) > 0", name="ck_card_loans_person_nonblank"
+        ),
         Index("ix_card_loans_user_direction", "user_id", "direction"),
     )
 
@@ -52,7 +56,10 @@ class CardLoan(Base):
     quantity_returned: Mapped[int] = mapped_column(nullable=False, server_default="0")
 
     loaned_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now()
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        server_default=func.now(),
     )
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     returned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

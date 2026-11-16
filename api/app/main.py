@@ -10,11 +10,12 @@ from app.core.errors import (
     validation_error_handler,
 )
 from app.core.logging import setup_logging
-from app.routers.collections import router as collections_router
 from app.routers.admin import router as admin_router
 from app.routers.auth import router as auth_router
-from app.routers.health import router as health_router
 from app.routers.cards import router as cards_router
+from app.routers.collections import router as collections_router
+from app.routers.health import router as health_router
+
 
 def create_app(config: Settings = settings) -> FastAPI:
     setup_logging(debug=config.ENV == "dev")
@@ -27,17 +28,9 @@ def create_app(config: Settings = settings) -> FastAPI:
     app.include_router(health_router, prefix="/health", tags=["health"])
     app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
-    app.include_router(
-        collections_router,
-        prefix="/collections",
-        tags=["collections"]
-    )
+    app.include_router(collections_router, prefix="/collections", tags=["collections"])
 
-    app.include_router(
-        admin_router,
-        prefix="/admin",
-        tags=["admin"]
-    )
+    app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
     app.include_router(cards_router, prefix="/cards", tags=["cards"])
 

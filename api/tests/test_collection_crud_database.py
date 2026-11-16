@@ -46,29 +46,47 @@ def test_create_update_delete_preserves_catalog_and_other_users():
         session.commit()
 
         db = AsyncAdapter(session)
-        entry = asyncio.run(collection_service.add_collection_entry(
-            db, user, user.id,
-            CollectionEntryCreate(printing_id=printing.id, quantity=0, note="za razmjenu"),
-        ))
+        entry = asyncio.run(
+            collection_service.add_collection_entry(
+                db,
+                user,
+                user.id,
+                CollectionEntryCreate(
+                    printing_id=printing.id, quantity=0, note="za razmjenu"
+                ),
+            )
+        )
         session.commit()
         assert entry.id is not None and entry.quantity == 0
         assert len(asyncio.run(collection_repo.list_for_user(db, other.id))) == 0
 
-        entry = asyncio.run(collection_service.update_collection_entry(
-            db, user, user.id, printing.id,
-            CollectionEntryUpdate(quantity=4),
-        ))
+        entry = asyncio.run(
+            collection_service.update_collection_entry(
+                db,
+                user,
+                user.id,
+                printing.id,
+                CollectionEntryUpdate(quantity=4),
+            )
+        )
         session.commit()
         assert entry.quantity == 4 and entry.note == "za razmjenu"
 
-        entry = asyncio.run(collection_service.update_collection_entry(
-            db, user, user.id, printing.id,
-            CollectionEntryUpdate(note=None),
-        ))
+        entry = asyncio.run(
+            collection_service.update_collection_entry(
+                db,
+                user,
+                user.id,
+                printing.id,
+                CollectionEntryUpdate(note=None),
+            )
+        )
         session.commit()
         assert entry.note is None
 
-        asyncio.run(collection_service.delete_collection_entry(db, user, user.id, printing.id))
+        asyncio.run(
+            collection_service.delete_collection_entry(db, user, user.id, printing.id)
+        )
         session.commit()
         assert session.scalars(select(CollectionEntry)).all() == []
         assert session.scalars(select(CardPrinting)).all() == [printing]

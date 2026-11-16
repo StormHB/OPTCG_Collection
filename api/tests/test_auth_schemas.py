@@ -24,6 +24,9 @@ def test_register_rejects_admin_role_from_client():
 
 def test_user_response_does_not_include_password_hash():
     from types import SimpleNamespace
-    user = SimpleNamespace(id=1, username="luffy_01", role="user", is_active=True, password_hash="secret")
+
+    user = SimpleNamespace(
+        id=1, username="luffy_01", role="user", is_active=True, password_hash="secret"
+    )
     result = UserResponse.model_validate(user).model_dump()
     assert "password_hash" not in result

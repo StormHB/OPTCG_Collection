@@ -63,25 +63,33 @@ def test_query_and_stats_count_only_owned_printings_not_loans():
         p6 = CardPrinting(card=event, product_set=op01, variant_code="regular")
         user = User(username="owner", password_hash="hash", role="user")
         other = User(username="other", password_hash="hash", role="user")
-        session.add_all([p1,p2,p3,p4,p5,p6,user,other])
+        session.add_all([p1, p2, p3, p4, p5, p6, user, other])
         session.flush()
-        session.add_all([
-            CollectionEntry(user_id=user.id, printing_id=p1.id, quantity=4),
-            CollectionEntry(user_id=user.id, printing_id=p2.id, quantity=8),
-            CollectionEntry(user_id=user.id, printing_id=p3.id, quantity=1),
-            CollectionEntry(user_id=user.id, printing_id=p4.id, quantity=10),
-            CollectionEntry(user_id=user.id, printing_id=p5.id, quantity=3),
-            CollectionEntry(user_id=user.id, printing_id=p6.id, quantity=0),
-            CollectionEntry(user_id=other.id, printing_id=p1.id, quantity=99),
-            CardLoan(
-                user_id=user.id, printing_id=p1.id, direction="lent",
-                person_name="Marko", quantity=2,
-            ),
-            CardLoan(
-                user_id=user.id, printing_id=p2.id, direction="borrowed",
-                person_name="Ivan", quantity=30,
-            ),
-        ])
+        session.add_all(
+            [
+                CollectionEntry(user_id=user.id, printing_id=p1.id, quantity=4),
+                CollectionEntry(user_id=user.id, printing_id=p2.id, quantity=8),
+                CollectionEntry(user_id=user.id, printing_id=p3.id, quantity=1),
+                CollectionEntry(user_id=user.id, printing_id=p4.id, quantity=10),
+                CollectionEntry(user_id=user.id, printing_id=p5.id, quantity=3),
+                CollectionEntry(user_id=user.id, printing_id=p6.id, quantity=0),
+                CollectionEntry(user_id=other.id, printing_id=p1.id, quantity=99),
+                CardLoan(
+                    user_id=user.id,
+                    printing_id=p1.id,
+                    direction="lent",
+                    person_name="Marko",
+                    quantity=2,
+                ),
+                CardLoan(
+                    user_id=user.id,
+                    printing_id=p2.id,
+                    direction="borrowed",
+                    person_name="Ivan",
+                    quantity=30,
+                ),
+            ]
+        )
         session.flush()
 
         db = AsyncAdapter(session)
@@ -96,9 +104,7 @@ def test_query_and_stats_count_only_owned_printings_not_loans():
         assert db.calls == 1, "Izbjegavamo N+1 upite"
         assert asyncio.run(
             collection_stats_repo.load_owned_printings(db, other.id)
-        ) == [
-            (99, "Character", "R", "OP01", "OP01-016")
-        ]
+        ) == [(99, "Character", "R", "OP01", "OP01-016")]
         assert asyncio.run(get_collection_stats(db, other, other.id)).playsets == 1
         # Read-only: upiti i izračun ne mogu mijenjati već spremljene podatke.
         assert session.get(CollectionEntry, 1).quantity == 4
@@ -119,7 +125,9 @@ def test_empty_collection_has_all_zeros():
         assert result.distinct_printings == 0
         assert result.playsets == 0
         assert result.playsets_by_type.model_dump() == {
-            "leader": 0, "don": 0, "other": 0
+            "leader": 0,
+            "don": 0,
+            "other": 0,
         }
     engine.dispose()
 

@@ -1,4 +1,5 @@
 """Testovi uvoza bez PostgreSQL-a i bez pristupnih podataka."""
+
 import asyncio
 import csv
 from pathlib import Path
@@ -7,7 +8,12 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.import_catalog import CatalogImportError, CatalogRow, import_rows, read_catalog_csv
+from app.import_catalog import (
+    CatalogImportError,
+    CatalogRow,
+    import_rows,
+    read_catalog_csv,
+)
 from app.models import Base, Card, CardPrinting, CardSet, Color
 
 
@@ -32,23 +38,29 @@ def make_csv(tmp_path: Path, rows):
 
 
 def test_validation_and_dual_color(tmp_path):
-    f = make_csv(tmp_path, [
-        ["OP01", "OP01-001", "Zoro", "Red/Green", "L", ""],
-        ["PRB01", "OP01-001", "Zoro", "Red/Green", "L", ""],
-    ])
+    f = make_csv(
+        tmp_path,
+        [
+            ["OP01", "OP01-001", "Zoro", "Red/Green", "L", ""],
+            ["PRB01", "OP01-001", "Zoro", "Red/Green", "L", ""],
+        ],
+    )
     r = read_catalog_csv(f)
     assert len(r) == 2
     assert r[0].colors == ("Red", "Green")
     assert r[1].original_set_code == "OP01"
 
 
-@pytest.mark.parametrize("bad_row", [
-    ["OP01", "FAIL", "Zoro", "Red", "L", ""],
-    ["OP01", "OP01-001", "", "Red", "L", ""],
-    ["OP01", "OP01-001", "Zoro", "Pink", "L", ""],
-    ["OP01", "OP01-001", "Zoro", "Red", "INVALID", ""],
-    ["OP01", "OP01-001", "Zoro", "Red", "L", "http://unsafe.test/a.png"],
-])
+@pytest.mark.parametrize(
+    "bad_row",
+    [
+        ["OP01", "FAIL", "Zoro", "Red", "L", ""],
+        ["OP01", "OP01-001", "", "Red", "L", ""],
+        ["OP01", "OP01-001", "Zoro", "Pink", "L", ""],
+        ["OP01", "OP01-001", "Zoro", "Red", "INVALID", ""],
+        ["OP01", "OP01-001", "Zoro", "Red", "L", "http://unsafe.test/a.png"],
+    ],
+)
 def test_validation_rejects_bad_rows(tmp_path, bad_row):
     with pytest.raises(CatalogImportError):
         read_catalog_csv(make_csv(tmp_path, [bad_row]))
@@ -64,19 +76,40 @@ def test_import_prb_and_idempotency_no_quantity_changes():
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as s:
-        s.add_all([
-            CardSet(code="OP01", name="OP01", sort_order=1),
-            CardSet(code="PRB01", name="PRB01", sort_order=2),
-            Color(name="Red"), Color(name="Green"),
-        ])
+        s.add_all(
+            [
+                CardSet(code="OP01", name="OP01", sort_order=1),
+                CardSet(code="PRB01", name="PRB01", sort_order=2),
+                Color(name="Red"),
+                Color(name="Green"),
+            ]
+        )
         s.commit()
         rows = [
-            CatalogRow("OP01", "OP01-001", "Zoro", ("Red", "Green"), "L", "https://example.com/a.png"),
-            CatalogRow("PRB01", "OP01-001", "Zoro", ("Red", "Green"), "L", "https://example.com/b.png"),
+            CatalogRow(
+                "OP01",
+                "OP01-001",
+                "Zoro",
+                ("Red", "Green"),
+                "L",
+                "https://example.com/a.png",
+            ),
+            CatalogRow(
+                "PRB01",
+                "OP01-001",
+                "Zoro",
+                ("Red", "Green"),
+                "L",
+                "https://example.com/b.png",
+            ),
         ]
         first = asyncio.run(import_rows(DbBridge(s), rows))
         s.commit()
-        assert (first.new_cards, first.new_printings, first.new_color_links) == (1, 2, 2)
+        assert (first.new_cards, first.new_printings, first.new_color_links) == (
+            1,
+            2,
+            2,
+        )
         cards = s.scalars(select(Card)).all()
         assert len(cards) == 1
         assert cards[0].card_type == "Leader"
@@ -84,7 +117,11 @@ def test_import_prb_and_idempotency_no_quantity_changes():
         assert len(s.scalars(select(CardPrinting)).all()) == 2
         second = asyncio.run(import_rows(DbBridge(s), rows))
         s.commit()
-        assert (second.new_cards, second.new_printings, second.new_color_links) == (0, 0, 0)
+        assert (second.new_cards, second.new_printings, second.new_color_links) == (
+            0,
+            0,
+            0,
+        )
         assert len(s.scalars(select(CardPrinting)).all()) == 2
     engine.dispose()
 
@@ -94,6 +131,11 @@ def test_missing_seed_values_does_not_import():
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         with pytest.raises(CatalogImportError, match="seed"):
-            asyncio.run(import_rows(DbBridge(s), [CatalogRow("OP01", "OP01-001", "Zoro", ("Red",), "L", None)]))
+            asyncio.run(
+                import_rows(
+                    DbBridge(s),
+                    [CatalogRow("OP01", "OP01-001", "Zoro", ("Red",), "L", None)],
+                )
+            )
         assert s.scalars(select(Card)).all() == []
     engine.dispose()

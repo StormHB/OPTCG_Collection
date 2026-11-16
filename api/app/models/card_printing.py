@@ -1,10 +1,20 @@
 """Fizičko izdanje: regular, alt art, manga, DON!! ilustracija, PRB reprint."""
+
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.card import Card
+    from app.models.card_set import CardSet
+    from app.models.collection_entry import CollectionEntry
+    from app.models.printing_external_id import PrintingExternalId
+
 
 class CardPrinting(Base):
     __tablename__ = "card_printings"

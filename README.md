@@ -244,3 +244,15 @@ Na kraju svakog testiranog koraka ažuriramo dokumentaciju te radimo **commit i 
 Prije commita provjeriti `git status`, `git diff --cached --stat` i `git diff --cached --check`; nikad ne commitati `.env`, tajne, osobne `.xlsx`, `backups/`, preuzete snapshotove ni `.venv/`.
 
 Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI.md`. Korak 10A: `docs/KORAK_10A_STATISTIKA_KOLEKCIJE.md`. Korak 10B: `docs/KORAK_10B_FILTERI_KOLEKCIJE.md`.
+
+### Backend revizija — Ruff cleanup
+
+- Provedeno formatiranje i sređivanje Python koda.
+- Ispravljeni neiskorišteni importi i varijable.
+- Ispravljene tipne reference SQLAlchemy modela pomoću TYPE_CHECKING.
+- Ispravljen redoslijed importa i predugački retci.
+- Ruff check: 0 grešaka.
+- Ruff format: sve datoteke pravilno formatirane.
+- Pytest: 243 uspješna testa.
+
+Sljedeći korak: stroga validacija JSON zahtjeva i dosljedni HTTP kodovi.

@@ -18,7 +18,9 @@ from app.core.errors import AppError, app_error_handler, validation_error_handle
 from app.models import Base, Card, CardPrinting, CardSet, CollectionEntry, User
 from app.routers.collections import router as collections_router
 from app.services.collection_excel_import import (
-    apply_plan, build_plan, parse_excel,
+    apply_plan,
+    build_plan,
+    parse_excel,
 )
 
 
@@ -44,20 +46,47 @@ class DbAdapter:
         self.session.flush()
 
 
-def excel_bytes(op01=3, prb01=2, *, variant_qty=None, variant_id=None,
-                note="Za deck", extra_op01=None):
+def excel_bytes(
+    op01=3,
+    prb01=2,
+    *,
+    variant_qty=None,
+    variant_id=None,
+    note="Za deck",
+    extra_op01=None,
+):
     wb = Workbook()
     overview = wb.active
     overview.title = "PREGLED"
     overview.append(["Set", "Ukupno komada"])
     overview.append(["UKUPNO", 999])  # mora biti ignoriran
     op = wb.create_sheet("OP01")
-    op.append(["Broj karte", "Ime karte", "Boja", "Količina", "Rijetkost", "Slika", "Napomena"])
+    op.append(
+        [
+            "Broj karte",
+            "Ime karte",
+            "Boja",
+            "Količina",
+            "Rijetkost",
+            "Slika",
+            "Napomena",
+        ]
+    )
     op.append(["OP01-016", "Nami", "Red", op01, "R", None, note])
     if extra_op01 is not None:
         op.append(["OP01-016", "Nami", "Red", extra_op01, "R", None, None])
     prb = wb.create_sheet("PRB01")
-    prb.append(["Broj karte", "Ime karte", "Boja", "Količina", "Rijetkost", "Slika", "Napomena"])
+    prb.append(
+        [
+            "Broj karte",
+            "Ime karte",
+            "Boja",
+            "Količina",
+            "Rijetkost",
+            "Slika",
+            "Napomena",
+        ]
+    )
     prb.append(["OP01-016", "Nami", "Red", prb01, "R", None, None])
     variants = wb.create_sheet("VARIJANTE")
     variants.append(["Broj karte", "Količina", "Napomena", "ID izdanja"])
@@ -72,7 +101,9 @@ def excel_bytes(op01=3, prb01=2, *, variant_qty=None, variant_id=None,
 @pytest.fixture()
 def catalog():
     engine = create_engine(
-        "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        "sqlite+pysqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
     with Session(engine, expire_on_commit=False) as session:
@@ -97,14 +128,18 @@ def run(coro):
 def test_parser_reads_real_sheet_layout_and_ignores_overview():
     parsed = parse_excel(excel_bytes(), "collection.xlsx")
     assert [(r.sheet, r.card_code, r.quantity) for r in parsed.entries] == [
-        ("OP01", "OP01-016", 3), ("PRB01", "OP01-016", 2)]
+        ("OP01", "OP01-016", 3),
+        ("PRB01", "OP01-016", 2),
+    ]
     assert parsed.sheets_read == 3
     assert parsed.issues == []
 
 
 def test_preview_does_not_write_and_distinguishes_reprint(catalog):
     session, owner, _, orig, reprint, _ = catalog
-    plan = run(build_plan(DbAdapter(session), owner.id, excel_bytes(), "list.xlsx", "replace"))
+    plan = run(
+        build_plan(DbAdapter(session), owner.id, excel_bytes(), "list.xlsx", "replace")
+    )
     assert plan.summary()["can_apply"] is True
     assert plan.summary()["create"] == 2
     assert {c.printing_id for c in plan.changes} == {orig.id, reprint.id}
@@ -120,10 +155,19 @@ def test_apply_creates_only_owner_entries_and_preview_repeats_as_unchanged(catal
     result = run(apply_plan(db, plan, plan.token))
     session.commit()
     assert (result["create"], result["update"]) == (2, 0)
-    stored = {entry.printing_id: entry.quantity for entry in session.scalars(
-        select(CollectionEntry).where(CollectionEntry.user_id == owner.id)).all()}
+    stored = {
+        entry.printing_id: entry.quantity
+        for entry in session.scalars(
+            select(CollectionEntry).where(CollectionEntry.user_id == owner.id)
+        ).all()
+    }
     assert stored == {orig.id: 3, reprint.id: 2}
-    assert session.scalars(select(CollectionEntry).where(CollectionEntry.user_id == other.id)).all() == []
+    assert (
+        session.scalars(
+            select(CollectionEntry).where(CollectionEntry.user_id == other.id)
+        ).all()
+        == []
+    )
     after = run(build_plan(db, owner.id, data, "list.xlsx", "replace"))
     assert after.summary()["unchanged"] == 2
     assert after.token != plan.token
@@ -131,7 +175,9 @@ def test_apply_creates_only_owner_entries_and_preview_repeats_as_unchanged(catal
 
 def test_add_accumulates_quantities_but_does_not_override_note(catalog):
     session, owner, _, orig, _, _ = catalog
-    session.add(CollectionEntry(user_id=owner.id, printing_id=orig.id, quantity=4, note="Važno"))
+    session.add(
+        CollectionEntry(user_id=owner.id, printing_id=orig.id, quantity=4, note="Važno")
+    )
     session.commit()
     db = DbAdapter(session)
     plan = run(build_plan(db, owner.id, excel_bytes(op01=3), "list.xlsx", "add"))
@@ -140,27 +186,61 @@ def test_add_accumulates_quantities_but_does_not_override_note(catalog):
     assert target.after_note == "Važno"
     run(apply_plan(db, plan, plan.token))
     session.commit()
-    assert session.scalar(select(CollectionEntry).where(
-        CollectionEntry.user_id == owner.id, CollectionEntry.printing_id == orig.id)).quantity == 7
+    assert (
+        session.scalar(
+            select(CollectionEntry).where(
+                CollectionEntry.user_id == owner.id,
+                CollectionEntry.printing_id == orig.id,
+            )
+        ).quantity
+        == 7
+    )
     with pytest.raises(AppError) as exc:
-        run(apply_plan(db, run(build_plan(db, owner.id, excel_bytes(op01=3), "list.xlsx", "add")), plan.token))
+        run(
+            apply_plan(
+                db,
+                run(build_plan(db, owner.id, excel_bytes(op01=3), "list.xlsx", "add")),
+                plan.token,
+            )
+        )
     assert exc.value.status_code == 409
 
 
 def test_replace_only_touches_printings_present_in_file(catalog):
     session, owner, _, orig, reprint, alt = catalog
-    session.add_all([
-        CollectionEntry(user_id=owner.id, printing_id=orig.id, quantity=9, note="ostaje"),
-        CollectionEntry(user_id=owner.id, printing_id=alt.id, quantity=5, note="alt"),
-    ])
+    session.add_all(
+        [
+            CollectionEntry(
+                user_id=owner.id, printing_id=orig.id, quantity=9, note="ostaje"
+            ),
+            CollectionEntry(
+                user_id=owner.id, printing_id=alt.id, quantity=5, note="alt"
+            ),
+        ]
+    )
     session.commit()
     db = DbAdapter(session)
     plan = run(build_plan(db, owner.id, excel_bytes(op01=3), "list.xlsx", "replace"))
     run(apply_plan(db, plan, plan.token))
     session.commit()
-    assert session.scalar(select(CollectionEntry).where(CollectionEntry.printing_id == orig.id)).quantity == 3
-    assert session.scalar(select(CollectionEntry).where(CollectionEntry.printing_id == orig.id)).note == "Za deck"
-    assert session.scalar(select(CollectionEntry).where(CollectionEntry.printing_id == alt.id)).quantity == 5
+    assert (
+        session.scalar(
+            select(CollectionEntry).where(CollectionEntry.printing_id == orig.id)
+        ).quantity
+        == 3
+    )
+    assert (
+        session.scalar(
+            select(CollectionEntry).where(CollectionEntry.printing_id == orig.id)
+        ).note
+        == "Za deck"
+    )
+    assert (
+        session.scalar(
+            select(CollectionEntry).where(CollectionEntry.printing_id == alt.id)
+        ).quantity
+        == 5
+    )
 
 
 def test_empty_and_zero_rows_do_not_create_thousands_of_zero_entries(catalog):
@@ -177,34 +257,46 @@ def test_empty_and_zero_rows_do_not_create_thousands_of_zero_entries(catalog):
 
 def test_existing_entry_can_be_set_to_zero_in_replace(catalog):
     session, owner, _, orig, _, _ = catalog
-    session.add(CollectionEntry(user_id=owner.id, printing_id=orig.id, quantity=4, note="keep"))
+    session.add(
+        CollectionEntry(user_id=owner.id, printing_id=orig.id, quantity=4, note="keep")
+    )
     session.commit()
     data = excel_bytes(op01=0, prb01=None, note=None)
     db = DbAdapter(session)
     plan = run(build_plan(db, owner.id, data, "list.xlsx", "replace"))
     run(apply_plan(db, plan, plan.token))
     session.commit()
-    entry = session.scalar(select(CollectionEntry).where(CollectionEntry.printing_id == orig.id))
+    entry = session.scalar(
+        select(CollectionEntry).where(CollectionEntry.printing_id == orig.id)
+    )
     assert entry.quantity == 0 and entry.note == "keep"
 
 
 def test_variants_require_exact_id_and_can_import_alt_art(catalog):
     session, owner, _, _, _, alt = catalog
     db = DbAdapter(session)
-    bad = run(build_plan(db, owner.id, excel_bytes(variant_qty=1), "list.xlsx", "replace"))
+    bad = run(
+        build_plan(db, owner.id, excel_bytes(variant_qty=1), "list.xlsx", "replace")
+    )
     assert bad.summary()["can_apply"] is False
     assert any(i.code == "missing_printing_id" for i in bad.issues)
     with pytest.raises(AppError):
         run(apply_plan(db, bad, bad.token))
-    good = run(build_plan(db, owner.id,
-                          excel_bytes(variant_qty=1, variant_id=alt.id), "list.xlsx", "replace"))
+    good = run(
+        build_plan(
+            db,
+            owner.id,
+            excel_bytes(variant_qty=1, variant_id=alt.id),
+            "list.xlsx",
+            "replace",
+        )
+    )
     assert good.summary()["can_apply"] is True
     assert any(c.printing_id == alt.id for c in good.changes)
 
 
 def test_missing_printing_blocks_entire_apply(catalog):
     session, owner, *_ = catalog
-    data = excel_bytes()
     wb = Workbook()
     sheet = wb.active
     sheet.title = "OP02"
@@ -281,8 +373,13 @@ def test_api_rejects_other_user_before_reading_spreadsheet():
     client = TestClient(app)
     response = client.post(
         "/collections/8/import/preview",
-        files={"file": ("my.xlsx", excel_bytes(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={
+            "file": (
+                "my.xlsx",
+                excel_bytes(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
     )
     assert response.status_code == 403
 
@@ -302,8 +399,13 @@ def test_api_preview_accepts_file_and_does_not_modify_db(catalog):
     client = TestClient(app)
     response = client.post(
         f"/collections/{owner.id}/import/preview?mode=replace",
-        files={"file": ("my.xlsx", excel_bytes(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={
+            "file": (
+                "my.xlsx",
+                excel_bytes(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
     )
     assert response.status_code == 200, response.text
     assert response.json()["create"] == 2
@@ -321,9 +423,13 @@ def test_unknown_sheet_with_data_blocks_apply(catalog):
     out = BytesIO()
     wb.save(out)
     wb.close()
-    plan = run(build_plan(DbAdapter(session), owner.id, out.getvalue(), "list.xlsx", "replace"))
+    plan = run(
+        build_plan(DbAdapter(session), owner.id, out.getvalue(), "list.xlsx", "replace")
+    )
     assert not plan.summary()["can_apply"]
-    assert any(i.code == "unsupported_sheet" and i.severity == "error" for i in plan.issues)
+    assert any(
+        i.code == "unsupported_sheet" and i.severity == "error" for i in plan.issues
+    )
 
 
 def test_api_preview_then_apply_with_matching_token(catalog):
@@ -341,16 +447,25 @@ def test_api_preview_then_apply_with_matching_token(catalog):
     app.dependency_overrides[get_current_user] = lambda: owner
     client = TestClient(app)
     file_bytes = excel_bytes()
-    file = {"file": ("my.xlsx", file_bytes,
-                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    file = {
+        "file": (
+            "my.xlsx",
+            file_bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    }
     preview = client.post(f"/collections/{owner.id}/import/preview", files=file)
     assert preview.status_code == 200
     token = preview.json()["plan_token"]
     applied = client.post(
         f"/collections/{owner.id}/import/apply",
-        params={"mode": "replace", "plan_token": token}, files=file,
+        params={"mode": "replace", "plan_token": token},
+        files=file,
     )
     assert applied.status_code == 200, applied.text
     assert applied.json()["status"] == "applied"
-    rows = {e.printing_id: e.quantity for e in session.scalars(select(CollectionEntry)).all()}
+    rows = {
+        e.printing_id: e.quantity
+        for e in session.scalars(select(CollectionEntry)).all()
+    }
     assert rows == {orig.id: 3, reprint.id: 2}

@@ -3,12 +3,12 @@
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Path, Query
-from pydantic import NonNegativeInt, StringConstraints
+from pydantic import AfterValidator, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_db
-from app.core.optional_auth import get_collection_filter_user
 from app.core.errors import AppError
+from app.core.optional_auth import get_collection_filter_user
 from app.models.user import User
 from app.schemas.card import (
     CardDetailResponse,
@@ -20,13 +20,28 @@ from app.services import card_service
 
 router = APIRouter()
 
-# "none" nije broj 0. Validacija se izvršava na svakom pojedinom tokenu.
+# Zasad podržani rasponi TCG filtera. Izvan raspona vracamo 422 prije SQL-a.
+CostSelection = Annotated[int, Field(ge=0, le=10)]
+PowerSelection = Annotated[int, Field(ge=0, le=13_000)]
+
+
+def _validate_counter_value(value: str) -> str:
+    """Izbjegni goleme brojeve i vrijednosti izvan PostgreSQL integer raspona."""
+    if value.lower() != "none" and int(value) > 2_147_483_647:
+        raise ValueError("Counter vrijednost prelazi podrzani raspon")
+    return value
+
+
+# 'none' predstavlja SQL NULL (a nije 0). Prvo provjera duljine i regexa,
+# tek nakon toga pretvaranje u int nad maksimalno 10 znakova.
 CounterSelection = Annotated[
     str,
     StringConstraints(
         strip_whitespace=True,
+        max_length=10,
         pattern=r"^(?:[Nn][Oo][Nn][Ee]|0|[1-9][0-9]*)$",
     ),
+    AfterValidator(_validate_counter_value),
 ]
 
 
@@ -36,8 +51,8 @@ async def list_cards(
     offset: int = Query(default=0, ge=0),
     colors: list[str] | None = Query(default=None),
     card_types: list[str] | None = Query(default=None),
-    costs: list[NonNegativeInt] | None = Query(default=None),
-    powers: list[NonNegativeInt] | None = Query(default=None),
+    costs: list[CostSelection] | None = Query(default=None),
+    powers: list[PowerSelection] | None = Query(default=None),
     attributes: list[str] | None = Query(default=None),
     counter_values: list[CounterSelection] | None = Query(default=None),
     block_icons: list[str] | None = Query(default=None),

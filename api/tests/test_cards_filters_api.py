@@ -88,7 +88,14 @@ def test_sets_and_archetypes_are_loaded_from_database():
 def test_empty_catalog_still_has_stable_categories():
     with patch.object(card_repo, "get_filter_values", new_callable=AsyncMock) as repo:
         values = _values()
-        for field in ("costs", "powers", "card_types", "rarities", "variants", "block_icons"):
+        for field in (
+            "costs",
+            "powers",
+            "card_types",
+            "rarities",
+            "variants",
+            "block_icons",
+        ):
             values[field] = []
         repo.return_value = values
         data = _client().get("/cards/filters").json()

@@ -48,7 +48,9 @@ async def add_collection_entry(
     except IntegrityError:
         # Dodatna zaštita od dva paralelna zahtjeva za isto izdanje.
         # get_db() će nakon iznimke napraviti rollback transakcije.
-        raise AppError("conflict", "Nije moguce dodati izdanje u kolekciju", 409) from None
+        raise AppError(
+            "conflict", "Nije moguce dodati izdanje u kolekciju", 409
+        ) from None
 
 
 async def update_collection_entry(

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.errors import AppError
 from app.models.user import User
 from app.services.collection_excel_import import (
     MAX_UPLOAD_BYTES,
@@ -13,7 +14,6 @@ from app.services.collection_excel_import import (
     build_plan,
 )
 from app.services.collection_service import ensure_collection_owner
-from app.core.errors import AppError
 
 router = APIRouter()
 
@@ -26,7 +26,9 @@ async def _read_upload(file: UploadFile) -> bytes:
     finally:
         await file.close()
     if not content or len(content) > MAX_UPLOAD_BYTES:
-        raise AppError("invalid_excel", "Excel ne smije biti prazan ili veći od 6 MB", 422)
+        raise AppError(
+            "invalid_excel", "Excel ne smije biti prazan ili veći od 6 MB", 422
+        )
     return content
 
 

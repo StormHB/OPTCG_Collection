@@ -27,9 +27,7 @@ def test_prazan_katalog_vraca_praznu_stranicu():
         repo.return_value = ([], 0)
         response = client.get("/cards")
         assert response.status_code == 200
-        assert response.json() == {
-            "items": [], "total": 0, "limit": 20, "offset": 0
-        }
+        assert response.json() == {"items": [], "total": 0, "limit": 20, "offset": 0}
         repo.assert_awaited_once()
         assert repo.await_args.kwargs == {"limit": 20, "offset": 0}
 
@@ -52,17 +50,19 @@ def test_katalog_vraca_kartu_i_ukupan_broj():
         response = client.get("/cards?limit=2&offset=4")
         assert response.status_code == 200
         assert response.json() == {
-            "items": [{
-                "id": 7,
-                "code": "OP01-001",
-                "name": "Roronoa Zoro",
-                "original_set_id": 1,
-                "card_type": "Leader",
-                "cost": None,
-                "power": 5000,
-                "counter": None,
-                "life": 5,
-            }],
+            "items": [
+                {
+                    "id": 7,
+                    "code": "OP01-001",
+                    "name": "Roronoa Zoro",
+                    "original_set_id": 1,
+                    "card_type": "Leader",
+                    "cost": None,
+                    "power": 5000,
+                    "counter": None,
+                    "life": 5,
+                }
+            ],
             "total": 123,
             "limit": 2,
             "offset": 4,
@@ -71,9 +71,7 @@ def test_katalog_vraca_kartu_i_ukupan_broj():
         assert repo.await_args.kwargs == {"limit": 2, "offset": 4}
 
 
-@pytest.mark.parametrize(
-    "params", ["limit=0", "limit=101", "offset=-1", "limit=abc"]
-)
+@pytest.mark.parametrize("params", ["limit=0", "limit=101", "offset=-1", "limit=abc"])
 def test_neispravna_paginacija_vraca_422(params: str):
     client = _make_client()
     with patch.object(card_repo, "list_paginated", new_callable=AsyncMock) as repo:

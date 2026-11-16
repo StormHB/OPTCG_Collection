@@ -13,7 +13,9 @@ def validate_bcrypt_length(value: str) -> str:
 
 
 Password = Annotated[str, Field(min_length=1), AfterValidator(validate_bcrypt_length)]
-NewPassword = Annotated[str, Field(min_length=8), AfterValidator(validate_bcrypt_length)]
+NewPassword = Annotated[
+    str, Field(min_length=8), AfterValidator(validate_bcrypt_length)
+]
 
 
 class RegisterRequest(BaseModel):

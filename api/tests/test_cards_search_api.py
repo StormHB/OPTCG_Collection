@@ -67,21 +67,58 @@ def catalog_db():
         rush, blocker = [Keyword(name=n) for n in ("Rush", "Blocker")]
 
         c1 = _card(
-            1, "OP01-001", "Dual Color", op01, "Character", 1, 6000, 1000,
-            colors=[red, green], attributes=[slash, strike],
-            archetypes=[straw, wb], keywords=[rush],
+            1,
+            "OP01-001",
+            "Dual Color",
+            op01,
+            "Character",
+            1,
+            6000,
+            1000,
+            colors=[red, green],
+            attributes=[slash, strike],
+            archetypes=[straw, wb],
+            keywords=[rush],
         )
         c2 = _card(
-            2, "OP01-002", "Yellow Warrior", op01, "Character", 2, 6000, 2000,
-            colors=[yellow], attributes=[strike], archetypes=[wb], keywords=[blocker],
+            2,
+            "OP01-002",
+            "Yellow Warrior",
+            op01,
+            "Character",
+            2,
+            6000,
+            2000,
+            colors=[yellow],
+            attributes=[strike],
+            archetypes=[wb],
+            keywords=[blocker],
         )
         c3 = _card(
-            3, "OP02-003", "Red Leader", op02, "Leader", 3, 5000, None,
-            colors=[red], attributes=[slash], archetypes=[straw],
+            3,
+            "OP02-003",
+            "Red Leader",
+            op02,
+            "Leader",
+            3,
+            5000,
+            None,
+            colors=[red],
+            attributes=[slash],
+            archetypes=[straw],
         )
         c4 = _card(
-            4, "OP02-004", "Green Soul", op02, "Character", 2, 6000, 0,
-            colors=[green], attributes=[strike], archetypes=[straw],
+            4,
+            "OP02-004",
+            "Green Soul",
+            op02,
+            "Character",
+            2,
+            6000,
+            0,
+            colors=[green],
+            attributes=[strike],
+            archetypes=[straw],
         )
         c5 = _card(5, "DON-001", "DON!!", don, "DON!!", None, None, None)
         c6 = _card(6, "OP02-005", "A_100% Card", op02, "Event", 1, 0, None)
@@ -189,7 +226,9 @@ def test_multivalued_attributes_and_archetypes_no_duplicates(catalog_db):
 def test_keywords_or_and_color_and_type(catalog_db):
     codes, total = _search(
         catalog_db,
-        keywords=("Rush", "Blocker"), colors=("Red",), card_types=("Character",)
+        keywords=("Rush", "Blocker"),
+        colors=("Red",),
+        card_types=("Character",),
     )
     assert codes == ["OP01-001"]
     assert total == 1
@@ -227,17 +266,17 @@ def test_printing_filters_must_match_same_printing(catalog_db):
 
 def test_rarity_and_variant_combination_does_not_mix_printings(catalog_db):
     assert _search(catalog_db, rarities=("SR",), variants=("regular",)) == (
-        ["OP01-002", "OP02-004"], 2
+        ["OP01-002", "OP02-004"],
+        2,
     )
     assert _search(catalog_db, rarities=("SR",), variants=("manga",)) == (
-        ["OP01-001"], 1
+        ["OP01-001"],
+        1,
     )
 
 
 def test_pagination_applies_after_filtering(catalog_db):
-    assert _search(catalog_db, colors=("Red",), limit=1, offset=1) == (
-        ["OP02-003"], 2
-    )
+    assert _search(catalog_db, colors=("Red",), limit=1, offset=1) == (["OP02-003"], 2)
 
 
 def test_search_case_insensitive_and_literal_wildcards(catalog_db):

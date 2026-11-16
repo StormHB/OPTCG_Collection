@@ -27,8 +27,11 @@ def _make_client(role: str | None) -> TestClient:
 def test_admin_moze_vidjeti_korisnike():
     client = _make_client("admin")
     admin = SimpleNamespace(
-        id=1, username="admin_test", role="admin",
-        is_active=True, password_hash="ne_smije_izaci",
+        id=1,
+        username="admin_test",
+        role="admin",
+        is_active=True,
+        password_hash="ne_smije_izaci",
     )
     with patch.object(admin_repo, "list_users", new_callable=AsyncMock) as repo:
         repo.return_value = [admin]

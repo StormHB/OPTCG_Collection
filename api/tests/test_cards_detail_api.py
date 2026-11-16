@@ -41,12 +41,20 @@ def _make_card():
         keywords=[SimpleNamespace(name="When Attacking")],
         printings=[
             SimpleNamespace(
-                id=40, product_set_id=1, variant_code="regular", rarity="L",
-                image_url="https://example.com/card40.png", block_icon="1"
+                id=40,
+                product_set_id=1,
+                variant_code="regular",
+                rarity="L",
+                image_url="https://example.com/card40.png",
+                block_icon="1",
             ),
             SimpleNamespace(
-                id=41, product_set_id=1, variant_code="alt", rarity="L",
-                image_url=None, block_icon="1"
+                id=41,
+                product_set_id=1,
+                variant_code="alt",
+                rarity="L",
+                image_url=None,
+                block_icon="1",
             ),
         ],
     )
@@ -54,7 +62,9 @@ def _make_card():
 
 def test_card_detail_includes_printings_and_metadata():
     client = _make_client()
-    with patch.object(card_repo, "get_by_id_with_details", new_callable=AsyncMock) as repo:
+    with patch.object(
+        card_repo, "get_by_id_with_details", new_callable=AsyncMock
+    ) as repo:
         repo.return_value = _make_card()
         response = client.get("/cards/12")  # Javni endpoint, bez tokena.
         assert response.status_code == 200, response.text
@@ -75,7 +85,9 @@ def test_card_detail_without_printings():
     client = _make_client()
     card = _make_card()
     card.printings = []
-    with patch.object(card_repo, "get_by_id_with_details", new_callable=AsyncMock) as repo:
+    with patch.object(
+        card_repo, "get_by_id_with_details", new_callable=AsyncMock
+    ) as repo:
         repo.return_value = card
         response = client.get("/cards/12")
         assert response.status_code == 200
@@ -84,18 +96,23 @@ def test_card_detail_without_printings():
 
 def test_card_not_found_returns_404():
     client = _make_client()
-    with patch.object(card_repo, "get_by_id_with_details", new_callable=AsyncMock) as repo:
+    with patch.object(
+        card_repo, "get_by_id_with_details", new_callable=AsyncMock
+    ) as repo:
         repo.return_value = None
         response = client.get("/cards/999999")
         assert response.status_code == 404
         assert response.json() == {
-            "code": "not_found", "message": "Karta nije pronadena"
+            "code": "not_found",
+            "message": "Karta nije pronadena",
         }
 
 
 def test_invalid_card_ids_return_422():
     client = _make_client()
-    with patch.object(card_repo, "get_by_id_with_details", new_callable=AsyncMock) as repo:
+    with patch.object(
+        card_repo, "get_by_id_with_details", new_callable=AsyncMock
+    ) as repo:
         for path in ("/cards/0", "/cards/-1", "/cards/xyz"):
             response = client.get(path)
             assert response.status_code == 422
