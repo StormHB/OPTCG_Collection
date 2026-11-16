@@ -8,12 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
 from app.schemas.card_loan import CardLoanCreate, CardLoanResponse, CardLoanReturn
+from app.schemas.error import error_responses
 from app.services import card_loan_service
 
 router = APIRouter(prefix="/{user_id}/loans", tags=["loans"])
 
 
-@router.get("", response_model=list[CardLoanResponse])
+@router.get(
+    "",
+    response_model=list[CardLoanResponse],
+    responses=error_responses(401, 403, 422),
+)
 async def list_loans(
     user_id: int = Path(ge=1),
     direction: Literal["lent", "borrowed"] | None = Query(default=None),
@@ -26,7 +31,12 @@ async def list_loans(
     )
 
 
-@router.post("", response_model=CardLoanResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=CardLoanResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(401, 403, 404, 409, 422),
+)
 async def create_loan(
     body: CardLoanCreate,
     user_id: int = Path(ge=1),
@@ -36,7 +46,11 @@ async def create_loan(
     return await card_loan_service.create_loan(db, current_user, user_id, body)
 
 
-@router.get("/{loan_id}", response_model=CardLoanResponse)
+@router.get(
+    "/{loan_id}",
+    response_model=CardLoanResponse,
+    responses=error_responses(401, 403, 404, 422),
+)
 async def get_loan(
     user_id: int = Path(ge=1),
     loan_id: int = Path(ge=1),
@@ -46,7 +60,11 @@ async def get_loan(
     return await card_loan_service.get_loan(db, current_user, user_id, loan_id)
 
 
-@router.post("/{loan_id}/returns", response_model=CardLoanResponse)
+@router.post(
+    "/{loan_id}/returns",
+    response_model=CardLoanResponse,
+    responses=error_responses(401, 403, 404, 409, 422),
+)
 async def return_loan(
     body: CardLoanReturn,
     user_id: int = Path(ge=1),

@@ -13,12 +13,17 @@ from app.schemas.collection import (
     CollectionEntryUpdate,
 )
 from app.schemas.collection_stats import CollectionStatsResponse
+from app.schemas.error import error_responses
 from app.services import collection_service, collection_stats_service
 
 router = APIRouter()
 
 
-@router.get("/{user_id}", response_model=list[CollectionEntryResponse])
+@router.get(
+    "/{user_id}",
+    response_model=list[CollectionEntryResponse],
+    responses=error_responses(401, 403, 422),
+)
 async def get_collection(
     user_id: int = Path(ge=1),
     db: AsyncSession = Depends(get_db),
@@ -32,6 +37,7 @@ async def get_collection(
     "/{user_id}/stats",
     response_model=CollectionStatsResponse,
     tags=["collection-stats"],
+    responses=error_responses(401, 403, 422),
 )
 async def get_collection_stats(
     user_id: int = Path(ge=1),
@@ -48,6 +54,7 @@ async def get_collection_stats(
     "/{user_id}/entries",
     response_model=CollectionEntryResponse,
     status_code=status.HTTP_201_CREATED,
+    responses=error_responses(401, 403, 404, 409, 422),
 )
 async def add_collection_entry(
     body: CollectionEntryCreate,
@@ -64,6 +71,7 @@ async def add_collection_entry(
 @router.patch(
     "/{user_id}/entries/{printing_id}",
     response_model=CollectionEntryResponse,
+    responses=error_responses(401, 403, 404, 409, 422),
 )
 async def update_collection_entry(
     body: CollectionEntryUpdate,
@@ -81,6 +89,7 @@ async def update_collection_entry(
 @router.delete(
     "/{user_id}/entries/{printing_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(401, 403, 404, 409, 422),
 )
 async def delete_collection_entry(
     user_id: int = Path(ge=1),

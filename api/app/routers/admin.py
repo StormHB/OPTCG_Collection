@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db
 from app.core.permissions import require_role
 from app.repositories import admin_repo
+from app.schemas.error import error_responses
 from app.schemas.user import UserResponse
 
 router = APIRouter()
@@ -15,6 +16,7 @@ router = APIRouter()
     "/users",
     response_model=list[UserResponse],
     dependencies=[Depends(require_role("admin"))],
+    responses=error_responses(401, 403, 422),
 )
 async def list_users(
     db: AsyncSession = Depends(get_db),

@@ -16,6 +16,7 @@ from app.schemas.card import (
     CardPageResponse,
 )
 from app.schemas.card_search import CardSearchFilters
+from app.schemas.error import error_responses
 from app.services import card_service
 
 router = APIRouter()
@@ -28,7 +29,11 @@ PowerSelection = Annotated[int, Field(ge=0, le=13_000)]
 CounterSelection = Literal["0", "1000", "2000"]
 
 
-@router.get("", response_model=CardPageResponse)
+@router.get(
+    "",
+    response_model=CardPageResponse,
+    responses=error_responses(401, 422),
+)
 async def list_cards(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -101,7 +106,11 @@ async def list_card_filters(
     return await card_service.get_card_filters(db)
 
 
-@router.get("/{card_id}", response_model=CardDetailResponse)
+@router.get(
+    "/{card_id}",
+    response_model=CardDetailResponse,
+    responses=error_responses(404, 422),
+)
 async def read_card(
     card_id: int = Path(ge=1),
     db: AsyncSession = Depends(get_db),

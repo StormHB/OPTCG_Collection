@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import Settings, settings
@@ -35,6 +36,24 @@ def create_app(config: Settings = settings) -> FastAPI:
     app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
     app.include_router(cards_router, prefix="/cards", tags=["cards"])
+
+    def custom_openapi() -> dict:
+        if app.openapi_schema is None:
+            schema = get_openapi(
+                title=app.title,
+                version=app.version,
+                routes=app.routes,
+            )
+            # GET /cards je javan bez osobnog filtera; bearer je potreban samo
+            # kada se trazi collection_status. OpenAPI security lista je OR.
+            schema["paths"]["/cards"]["get"]["security"] = [
+                {},
+                {"HTTPBearer": []},
+            ]
+            app.openapi_schema = schema
+        return app.openapi_schema
+
+    app.openapi = custom_openapi
 
     return app
 

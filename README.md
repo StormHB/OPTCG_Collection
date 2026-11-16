@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje: 16. 11. 2026. — revizija backenda.** Funkcionalnosti do Koraka 10B (autentikacija, katalog, osobni filteri, kolekcije, Excel import, posudbe i statistika) implementirane su i spojene u `main`. Koraci 11A.1–11A.3 te regresijske cjeline 11B.1 i 11B.2A–11B.2D lokalno su provjereni na branchu `fix/backend-validation`. Prije završnog PR-a slijedi zasebna PostgreSQL testna baza za paralelne transakcije, zaključavanje i rollback; Vue frontend dolazi tek nakon backend dijela.
+> **Stanje: 16. 11. 2026. — revizija backenda.** Funkcionalnosti do Koraka 10B (autentikacija, katalog, osobni filteri, kolekcije, Excel import, posudbe i statistika) implementirane su i spojene u `main`. Koraci 11A.1–11A.3, regresijske cjeline 11B.1 i 11B.2A–11B.2D te završna OpenAPI revizija 11B.3 lokalno su provjereni na branchu `fix/backend-validation`. Sljedeći obavezni korak je 11C: zasebna PostgreSQL testna baza za paralelne transakcije, zaključavanje i rollback; Vue frontend dolazi tek nakon backend dijela.
 
 ## Napredak
 
@@ -26,6 +26,8 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 11B.2B | CRUD osobne kolekcije i konkurentnost | ✅ Lokalno provjereno: 7 novih / 432 ukupno |
 | 11B.2C | Excel import | ✅ Lokalno provjereno: 9 novih / 441 ukupno |
 | 11B.2D | Posudbe | ✅ Lokalno provjereno: 7 novih / 448 ukupno |
+| 11B.3 | API rute, Swagger/OpenAPI i HTTP ugovor | ✅ Lokalno provjereno: 8 novih / 456 ukupno |
+| 11C | Izolirana PostgreSQL testna baza i stvarna konkurentnost | ⏳ Sljedeće — obavezno prije PR-a |
 | Kasnije | DON!!/varijante, Vue frontend, objava | Planirano |
 
 ## Tehnologije
@@ -315,3 +317,13 @@ Ruff cleanup završen je prije Koraka 11A.2. Stroga validacija 11A.2 i ugovor HT
 - Potvrđeni su PostgreSQL `FOR UPDATE` upiti za vlasnički redak pri stvaranju i za loan redak pri povratu, uz redoslijed `owned_lock → outstanding`.
 - SQLite/mock testovi ne dokazuju stvarno blokiranje paralelnih PostgreSQL transakcija; obavezni scenariji za zasebnu trajnu testnu bazu dokumentirani su u `docs/KORAK_11B2D_POSUDBE.md`.
 - Dodano je sedam regresijskih testova; ciljana cjelina ima 116, puni suite 448 prolaznih testova, a Ruff provjere prolaze.
+
+### Korak 11B.3 — API rute, Swagger/OpenAPI i HTTP ugovor
+
+- Generirana OpenAPI shema uspoređena je sa svih 20 registriranih aplikacijskih operacija, njihovim metodama, parametrima, request/response modelima i statusnim kodovima.
+- Swagger sada razlikuje potpuno javne rute, privatne bearer rute i uvjetno autentificirani `GET /cards`; `Authorize` koristi JWT bearer access token.
+- Dokumentirani su kontrolirani odgovori `401`, `403`, `404`, `409`, `413` i `422`, uključujući stvarni oblik `validation_error` odgovora s poljima `code`, `message` i `errors`.
+- Excel preview/apply dobili su eksplicitne response modele, a dokumentirani su i `plan_token`, načini `replace`/`add`, osobni filtri, Counter opcije te vremenske zone posudbi.
+- Dodano je osam ciljnih OpenAPI testova; puni suite ima 456 prolaznih testova. Detalji: `docs/KORAK_11B3_OPENAPI_REVIZIJA.md`.
+
+Sljedeći obavezni korak je **11C**: zasebna trajna PostgreSQL testna baza bez osobnih podataka, automatsko postavljanje sheme te stvarni testovi paralelnih transakcija, zaključavanja i rollbacka prije PR-a u `main`.

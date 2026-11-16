@@ -11,6 +11,7 @@ from app.schemas.auth import (
     RegisterRequest,
     TokenResponse,
 )
+from app.schemas.error import error_responses
 from app.schemas.user import UserResponse
 from app.services import auth_service
 
@@ -18,25 +19,32 @@ router = APIRouter()
 
 
 @router.post(
-    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(409, 422),
 )
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     return await auth_service.register_user(db, body.username, body.password)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login", response_model=TokenResponse, responses=error_responses(401, 422)
+)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = await auth_service.authenticate_user(db, body.username, body.password)
     access, refresh = auth_service.create_tokens(user)
     return TokenResponse(access_token=access, refresh_token=refresh)
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh", response_model=TokenResponse, responses=error_responses(401, 422)
+)
 async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     access, refresh = await auth_service.refresh_tokens(db, body.refresh_token)
     return TokenResponse(access_token=access, refresh_token=refresh)
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse, responses=error_responses(401))
 async def me(current_user: User = Depends(get_current_user)):
     return current_user
