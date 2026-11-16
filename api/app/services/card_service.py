@@ -100,15 +100,15 @@ def _with_defaults(values: list[str], defaults: tuple[str, ...]) -> list[str]:
 async def get_card_filters(db: AsyncSession) -> CardFilterOptionsResponse:
     """Pripremi javne opcije; novo otkriveni podaci pojavljuju se automatski."""
     values = await card_repo.get_filter_values(db)
-    counter_values = sorted(set(values["counter_values"]) | {1000, 2000})
-    # None nije broj 0: znači da tiskani Counter ne postoji.
+    counter_values = [0, 1000, 2000]
+    # Nedostajući Counter (SQL NULL) ima zaseban counter_missing=true.
     return CardFilterOptionsResponse(
         colors=_preferred_order(values["colors"], _COLORS),
         card_types=_with_defaults(values["card_types"], _CARD_TYPES),
         costs=sorted(set(values["costs"])),
         powers=sorted(set(values["powers"])),
         attributes=_preferred_order(values["attributes"], _ATTRIBUTES),
-        counter_values=[None, *counter_values],
+        counter_values=counter_values,
         block_icons=_with_defaults(values["block_icons"], _BLOCK_ICONS),
         keywords=sorted(set(values["keywords"])),
         archetypes=sorted(set(values["archetypes"])),

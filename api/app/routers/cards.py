@@ -3,7 +3,7 @@
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Path, Query
-from pydantic import AfterValidator, Field, StringConstraints
+from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_db
@@ -25,24 +25,7 @@ CostSelection = Annotated[int, Field(ge=0, le=10)]
 PowerSelection = Annotated[int, Field(ge=0, le=13_000)]
 
 
-def _validate_counter_value(value: str) -> str:
-    """Izbjegni goleme brojeve i vrijednosti izvan PostgreSQL integer raspona."""
-    if value.lower() != "none" and int(value) > 2_147_483_647:
-        raise ValueError("Counter vrijednost prelazi podrzani raspon")
-    return value
-
-
-# 'none' predstavlja SQL NULL (a nije 0). Prvo provjera duljine i regexa,
-# tek nakon toga pretvaranje u int nad maksimalno 10 znakova.
-CounterSelection = Annotated[
-    str,
-    StringConstraints(
-        strip_whitespace=True,
-        max_length=10,
-        pattern=r"^(?:[Nn][Oo][Nn][Ee]|0|[1-9][0-9]*)$",
-    ),
-    AfterValidator(_validate_counter_value),
-]
+CounterSelection = Literal["0", "1000", "2000"]
 
 
 @router.get("", response_model=CardPageResponse)
@@ -55,6 +38,10 @@ async def list_cards(
     powers: list[PowerSelection] | None = Query(default=None),
     attributes: list[str] | None = Query(default=None),
     counter_values: list[CounterSelection] | None = Query(default=None),
+    counter_missing: bool | None = Query(
+        default=None,
+        description="Ukljuci karte bez tiskane Counter vrijednosti (SQL NULL).",
+    ),
     block_icons: list[str] | None = Query(default=None),
     keywords: list[str] | None = Query(default=None),
     archetypes: list[str] | None = Query(default=None),
@@ -76,7 +63,7 @@ async def list_cards(
     """Ponovljeni parametri = OR, različite kategorije = AND.
 
     Npr. /cards?colors=Red&colors=Yellow&costs=1&costs=2&powers=6000
-    Counter vrijednost bez tiskane oznake: counter_values=none.
+    Counter vrijednost bez tiskane oznake: counter_missing=true.
     """
     if collection_status and current_user is None:
         raise AppError(
@@ -91,7 +78,8 @@ async def list_cards(
         costs=tuple(costs or ()),
         powers=tuple(powers or ()),
         attributes=tuple(attributes or ()),
-        counter_values=tuple(counter_values or ()),
+        counter_values=tuple(counter_values or ())
+        + (("none",) if counter_missing else ()),
         block_icons=tuple(block_icons or ()),
         keywords=tuple(keywords or ()),
         archetypes=tuple(archetypes or ()),

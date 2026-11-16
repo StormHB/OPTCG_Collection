@@ -69,7 +69,7 @@ class CardFilterOptionsResponse(BaseModel):
     costs: list[int]
     powers: list[int]
     attributes: list[str]
-    counter_values: list[int | None]  # NULL = nema tiskane Counter vrijednosti.
+    counter_values: list[int]  # Bez NULL-a; koristi se counter_missing=true.
     block_icons: list[str]
     keywords: list[str]
     archetypes: list[str]

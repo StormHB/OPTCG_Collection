@@ -112,7 +112,7 @@ def test_counter_casefold_in_repository(db):
     assert check(db, counter_values=("NONE",)) == ([], 0)
 
 
-def test_counter_none_case_insensitive_in_http_validation():
+def test_legacy_counter_none_is_rejected_before_repository():
     app = create_app()
 
     async def fake_db():
@@ -123,5 +123,6 @@ def test_counter_none_case_insensitive_in_http_validation():
         mocked.return_value = ([], 0)
         with TestClient(app) as client:
             response = client.get("/cards?counter_values=NONE")
-        assert response.status_code == 200, response.text
-        assert mocked.await_args.kwargs["filters"].counter_values == ("NONE",)
+        assert response.status_code == 422, response.text
+        assert response.json()["code"] == "validation_error"
+        mocked.assert_not_awaited()

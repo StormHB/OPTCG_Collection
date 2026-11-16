@@ -69,7 +69,7 @@ def test_counter_null_is_distinct_from_numerical_zero():
         values["counter_values"] = [0, 2000]
         repo.return_value = values
         data = _client().get("/cards/filters").json()
-        assert data["counter_values"] == [None, 0, 1000, 2000]
+        assert data["counter_values"] == [0, 1000, 2000]
 
 
 def test_sets_and_archetypes_are_loaded_from_database():

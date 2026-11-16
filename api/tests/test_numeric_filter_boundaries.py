@@ -34,8 +34,11 @@ def client():
         "counter_values=-1",
         "counter_values=1.5",
         "counter_values=abc",
+        "counter_values=none",
+        "counter_values=3000",
         "counter_values=2147483648",
         "counter_values=" + "9" * 4400,
+        "counter_missing=unknown",
     ],
 )
 def test_invalid_numeric_filters_return_422_without_repository_call(query):
@@ -57,9 +60,12 @@ def test_invalid_numeric_filters_return_422_without_repository_call(query):
         ("counter_values=0", "counter_values", ("0",)),
         ("counter_values=1000", "counter_values", ("1000",)),
         ("counter_values=2000", "counter_values", ("2000",)),
-        ("counter_values=none", "counter_values", ("none",)),
-        ("counter_values=NONE", "counter_values", ("NONE",)),
-        ("counter_values=2147483647", "counter_values", ("2147483647",)),
+        ("counter_missing=true", "counter_values", ("none",)),
+        (
+            "counter_values=0&counter_missing=true",
+            "counter_values",
+            ("0", "none"),
+        ),
     ],
 )
 def test_valid_boundaries_keep_filter_values(query, field, expected):

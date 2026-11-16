@@ -21,7 +21,8 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 11A.1 | Numerički filteri, Counter dropdown i Ruff cleanup | ✅ Lokalno provjereno; commitano |
 | 11A.2 | Stroga validacija JSON zahtjeva | 🔄 Pripremljeno; čeka lokalnu provjeru |
 | 11A.3 | Provjera HTTP kodova i poruka | ⏳ Sljedeće |
-| 11B | Regresijska provjera svih filtera i API ruta | ⏳ Planirano |
+| 11B.1 | Regresijska provjera filtera kataloga | ✅ Lokalno provjereno: 71 ciljani / 393 ukupno |
+| 11B.2+ | Regresijska provjera ostalih API ruta | ⏳ Planirano |
 | Kasnije | DON!!/varijante, Vue frontend, objava | Planirano |
 
 ## Tehnologije
@@ -273,3 +274,10 @@ Ruff cleanup završen je prije Koraka 11A.2. Korak 11A.2 pripremljen je za lokal
 - Nema nove migracije; Alembic ostaje na `004 (head)`.
 
 **Stanje provjere 11A.2:** 306/306 testova na izoliranoj kopiji projekta. Za posljednje promjene još se čekaju korisnička lokalna potvrda punog `pytest` skupa, Ruff provjere i commit. Posljednji potvrđeni lokalni rezultat prije 11A.2 bio je 243/243 testova uz nula Ruff grešaka i `004 (head)`.
+
+### Korak 11B.1 — regresija filtera kataloga
+
+- `counter_values` prihvaća samo `0`, `1000` i `2000`; OpenAPI prikazuje isti enum.
+- Nedostajući tiskani Counter bira se s `counter_missing=true`; stari `counter_values=none` i vrijednosti izvan dropdowna vraćaju `422` prije repozitorija.
+- Potvrđeno lokalno: ciljna matrica 71/71, puni suite 393/393, Ruff check i format check bez grešaka.
+- Detalji: `docs/KORAK_11B1_REGRESIJA_FILTERA.md`.
