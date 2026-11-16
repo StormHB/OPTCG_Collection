@@ -35,7 +35,7 @@ Nova datoteka `api/tests/test_auth_authorization_matrix_11b2a.py` dodaje 32 slu�
 - Refresh token ne može pristupiti `/auth/me`, a access token ne može se koristiti na `/auth/refresh`.
 - Istekli, sintaktički neispravni i izmijenjeni tokeni vraćaju `401` prije dohvata korisnika.
 - Nepostojeći i deaktivirani korisnik odbijaju se i za access i za refresh tok.
-- Valjani refresh aktivnog korisnika izdaje novi access/refresh par.
+- Valjani refresh aktivnog korisnika izdaje valjani access/refresh par. Trenutačna stateless JWT implementacija nema pohranu ni opoziv prethodnog refresh tokena, pa test ne tvrdi da postoji stvarna rotacija tokena.
 - Tijela grešaka ne sadrže poslani JWT, lozinku ni hash.
 
 ### Uloge, vlasništvo i osobni filteri

@@ -89,7 +89,7 @@ def test_valid_registration_hashes_password_and_never_returns_it():
         patch(
             "app.services.auth_service.hash_password",
             return_value="bcrypt-secret-hash",
-        ),
+        ) as hash_password,
     ):
         response = _client().post(
             "/auth/register",
@@ -104,7 +104,10 @@ def test_valid_registration_hashes_password_and_never_returns_it():
     }
     assert "password" not in response.text.lower()
     assert "bcrypt-secret-hash" not in response.text
-    assert create_user.await_args.args[1].role == "user"
+    hash_password.assert_called_once_with("password123")
+    created_user = create_user.await_args.args[1]
+    assert created_user.password_hash == "bcrypt-secret-hash"
+    assert created_user.role == "user"
 
 
 def test_duplicate_username_returns_safe_409_without_write():
@@ -148,7 +151,10 @@ def test_login_rejects_wrong_password_inactive_and_missing_user_without_tokens(
             "/auth/login", json={"username": "user_7", "password": "wrong-value"}
         )
     assert response.status_code == 401
-    assert response.json()["code"] == "invalid_credentials"
+    assert response.json() == {
+        "code": "invalid_credentials",
+        "message": "Neispravno korisnicko ime ili lozinka",
+    }
     assert "wrong-value" not in response.text
     assert "private-hash" not in response.text
     assert "token" not in response.text.lower()
@@ -270,17 +276,31 @@ def test_refresh_rejects_missing_and_inactive_database_user(database_user):
     assert token not in response.text
 
 
-def test_refresh_rotates_both_tokens_for_active_user():
-    old_refresh = create_refresh_token(7)
+def test_refresh_issues_valid_access_and_refresh_pair_for_active_user():
+    refresh_token = create_refresh_token(7)
     with patch.object(
         user_repo, "get_by_id", new_callable=AsyncMock, return_value=_user()
     ):
-        response = _client().post("/auth/refresh", json={"refresh_token": old_refresh})
+        response = _client().post(
+            "/auth/refresh", json={"refresh_token": refresh_token}
+        )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["access_token"]
-    assert body["refresh_token"]
     assert body["access_token"] != body["refresh_token"]
+    access_payload = jwt.decode(
+        body["access_token"],
+        settings.JWT_SECRET,
+        algorithms=[ALGORITHM],
+        issuer=settings.JWT_ISSUER,
+    )
+    refresh_payload = jwt.decode(
+        body["refresh_token"],
+        settings.JWT_SECRET,
+        algorithms=[ALGORITHM],
+        issuer=settings.JWT_ISSUER,
+    )
+    assert (access_payload["sub"], access_payload["type"]) == ("7", "access")
+    assert (refresh_payload["sub"], refresh_payload["type"]) == ("7", "refresh")
 
 
 @pytest.mark.parametrize(
@@ -339,6 +359,12 @@ def test_url_user_id_cannot_bypass_collection_ownership(method, path, json_body)
         patch.object(
             collection_repo, "create_entry", new_callable=AsyncMock
         ) as create_entry,
+        patch.object(
+            collection_repo, "update_entry", new_callable=AsyncMock
+        ) as update_entry,
+        patch.object(
+            collection_repo, "delete_entry", new_callable=AsyncMock
+        ) as delete_entry,
     ):
         response = _client().request(
             method, path, headers=_authorization(token), json=json_body
@@ -348,6 +374,8 @@ def test_url_user_id_cannot_bypass_collection_ownership(method, path, json_body)
     list_entries.assert_not_awaited()
     get_entry.assert_not_awaited()
     create_entry.assert_not_awaited()
+    update_entry.assert_not_awaited()
+    delete_entry.assert_not_awaited()
 
 
 def test_personal_filter_uses_jwt_identity_and_ignores_user_id_query():
