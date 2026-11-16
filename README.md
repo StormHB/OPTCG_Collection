@@ -22,7 +22,8 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 11A.2 | Stroga validacija JSON zahtjeva | 🔄 Pripremljeno; čeka lokalnu provjeru |
 | 11A.3 | Provjera HTTP kodova i poruka | ⏳ Sljedeće |
 | 11B.1 | Regresijska provjera filtera kataloga | ✅ Lokalno provjereno: 71 ciljani / 393 ukupno |
-| 11B.2+ | Regresijska provjera ostalih API ruta | ⏳ Planirano |
+| 11B.2A | Autentikacija, autorizacija i vlasništvo | ✅ Lokalno provjereno: 32 nova / 425 ukupno |
+| 11B.2B+ | Regresijska provjera ostalih API ruta | ⏳ Planirano |
 | Kasnije | DON!!/varijante, Vue frontend, objava | Planirano |
 
 ## Tehnologije
@@ -281,3 +282,10 @@ Ruff cleanup završen je prije Koraka 11A.2. Korak 11A.2 pripremljen je za lokal
 - Nedostajući tiskani Counter bira se s `counter_missing=true`; stari `counter_values=none` i vrijednosti izvan dropdowna vraćaju `422` prije repozitorija.
 - Potvrđeno lokalno: ciljna matrica 71/71, puni suite 393/393, Ruff check i format check bez grešaka.
 - Detalji: `docs/KORAK_11B1_REGRESIJA_FILTERA.md`.
+
+### Korak 11B.2A — autentikacija, autorizacija i vlasništvo
+
+- Proširena je regresijska matrica registracije, prijave, access/refresh tokena, isteka i izmjene JWT-a te nepostojećih i deaktiviranih korisnika.
+- Potvrđeno je da se administratorska uloga čita iz aktualnog zapisa baze, a administrator nema automatski pristup tuđoj osobnoj kolekciji.
+- Promjena `user_id` u URL-u ili queryju ne može zaobići vlasništvo; osobni filteri koriste samo identitet iz JWT-a.
+- Nova matrica ima 32 izolirana testa; puni suite ima 425 prolaznih testova, a Ruff provjere prolaze. Detalji su u `docs/KORAK_11B2A_AUTORIZACIJA.md`.
