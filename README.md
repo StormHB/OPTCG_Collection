@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje: 16. 11. 2026. — revizija backenda.** Funkcionalnosti do Koraka 10B (autentikacija, katalog, osobni filteri, kolekcije, Excel import, posudbe i statistika) implementirane su i spojene u `main`. Korak 11A.1 (numerički filteri, Counter dropdown i Ruff cleanup) lokalno je provjeren i committan na `fix/backend-validation`. Korak 11A.2 (stroga JSON validacija) pripremljen je za lokalnu provjeru; zatim slijede 11A.3 i 11B. Vue frontend dolazi tek nakon backend dijela.
+> **Stanje: 16. 11. 2026. — revizija backenda.** Funkcionalnosti do Koraka 10B (autentikacija, katalog, osobni filteri, kolekcije, Excel import, posudbe i statistika) implementirane su i spojene u `main`. Koraci 11A.1–11A.3 te regresijske cjeline 11B.1, 11B.2A i 11B.2B lokalno su provjereni na branchu `fix/backend-validation`. Slijede 11B.2C (Excel import) i 11B.2D (posudbe); Vue frontend dolazi tek nakon backend dijela.
 
 ## Napredak
 
@@ -19,12 +19,13 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 10A | Statistika kolekcije i playsetova (read-only API) | ✅ |
 | 10B | Filteri `owned`, `missing`, `playset` i aliasi setova | ✅ Spojeno u `main` |
 | 11A.1 | Numerički filteri, Counter dropdown i Ruff cleanup | ✅ Lokalno provjereno; commitano |
-| 11A.2 | Stroga validacija JSON zahtjeva | 🔄 Pripremljeno; čeka lokalnu provjeru |
-| 11A.3 | Provjera HTTP kodova i poruka | ⏳ Sljedeće |
+| 11A.2 | Stroga validacija JSON zahtjeva | ✅ Lokalno provjereno |
+| 11A.3 | Provjera HTTP kodova i poruka | ✅ Lokalno provjereno |
 | 11B.1 | Regresijska provjera filtera kataloga | ✅ Lokalno provjereno: 71 ciljani / 393 ukupno |
 | 11B.2A | Autentikacija, autorizacija i vlasništvo | ✅ Lokalno provjereno: 32 nova / 425 ukupno |
-| 11B.2B | CRUD osobne kolekcije i konkurentnost | ✅ Lokalno provjereno: 6 novih / 431 ukupno |
-| 11B.2C+ | Regresijska provjera ostalih API ruta | ⏳ Planirano |
+| 11B.2B | CRUD osobne kolekcije i konkurentnost | ✅ Lokalno provjereno: 7 novih / 432 ukupno |
+| 11B.2C | Excel import | ⏳ Sljedeće |
+| 11B.2D | Posudbe | ⏳ Planirano |
 | Kasnije | DON!!/varijante, Vue frontend, objava | Planirano |
 
 ## Tehnologije
@@ -231,7 +232,7 @@ Prije većeg upisa preporučuje se sigurnosna kopija baze. Privatne Excel datote
 
 **Korak 9B — API posudbi:** omogućeni su pregled, unos i djelomični/potpuni povrat. Ne može se posuditi više vlastitih primjeraka nego što je raspoloživo; aktivne posudbe štite od smanjivanja količine kroz PATCH, brisanje ili Excel `replace`. Posudba **ne mijenja vlasničku količinu** u `collection_entries`; tuđe posuđene karte **ne povećavaju vlastite playsetove**. Odgovori uključuju točan `printing_id`, kod, set i URL ilustracije za budući Vue prikaz. Dokumentacija: `docs/KORAK_09B_API_POSUDBI.md`.
 
-**Dalje:** lokalno potvrditi 11A.2, zatim završiti 11A.3 (HTTP statusi i poruke) i 11B (regresijska provjera svih filtera i poslovnih pravila). Tek nakon backend cjeline planirati Vue frontend; dopune DON!! i alternativnih izdanja ostaju zasebni zadaci.
+**Dalje:** Korak 11B.2C regresijski provjerava Excel import, a 11B.2D posudbe. Tek nakon backend cjeline planirati Vue frontend; dopune DON!! i alternativnih izdanja ostaju zasebni zadaci.
 
 Za nove datumsko-vremenske API podatke koristimo Pydantic `AwareDatetime`, normalizaciju na UTC (`datetime.now(timezone.utc)` i `.astimezone(timezone.utc)`), a lokalnu zonu samo za prikaz.
 
@@ -263,7 +264,7 @@ Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI
 - Ruff format: sve datoteke pravilno formatirane.
 - Pytest: 243 uspješna testa.
 
-Ruff cleanup završen je prije Koraka 11A.2. Korak 11A.2 pripremljen je za lokalnu potvrdu, nakon čega slijedi provjera HTTP kodova i poruka.
+Ruff cleanup završen je prije Koraka 11A.2. Stroga validacija 11A.2 i ugovor HTTP kodova/poruka 11A.3 naknadno su lokalno potvrđeni punim regresijskim skupom.
 
 ### Korak 11A.2 — stroga validacija JSON zahtjeva
 
@@ -275,7 +276,7 @@ Ruff cleanup završen je prije Koraka 11A.2. Korak 11A.2 pripremljen je za lokal
 - Regresijski testovi: `api/tests/test_request_body_validation.py`. Detalji: `docs/KORAK_11A2_STROGA_JSON_VALIDACIJA.md`.
 - Nema nove migracije; Alembic ostaje na `004 (head)`.
 
-**Stanje provjere 11A.2:** 306/306 testova na izoliranoj kopiji projekta. Za posljednje promjene još se čekaju korisnička lokalna potvrda punog `pytest` skupa, Ruff provjere i commit. Posljednji potvrđeni lokalni rezultat prije 11A.2 bio je 243/243 testova uz nula Ruff grešaka i `004 (head)`.
+**Stanje provjere 11A.2 i 11A.3:** uključeni su u aktualni puni lokalni regresijski skup; stroga validacija, sigurni HTTP odgovori i Ruff provjere prolaze. Alembic ostaje `004 (head)`.
 
 ### Korak 11B.1 — regresija filtera kataloga
 
@@ -295,5 +296,6 @@ Ruff cleanup završen je prije Koraka 11A.2. Korak 11A.2 pripremljen je za lokal
 
 - Ponovno su provjereni POST, GET, PATCH i DELETE ugovori, granice količine, parcijalne izmjene, vlasništvo i zaštita aktivnih posudbi.
 - Dodatno su potvrđeni DB unique constraint i sigurni `409` fallback za istodobno stvaranje duplikata te PostgreSQL `FOR UPDATE` u PATCH/DELETE putu.
+- Ispravljen je race pri DELETE-u: ako zapis nestane prije zaključavanja, API vraća kontrolirani `404` bez loan upita ili ponovnog brisanja.
 - SQLite/mock testovi ne dokazuju stvarno raspoređivanje paralelnih PostgreSQL transakcija; potrebni scenariji i postojeća “zadnji commit pobjeđuje” PATCH semantika dokumentirani su zasebno.
-- Dodano je šest izoliranih regresijskih testova; ciljna cjelina ima 98, puni suite 431 prolazni test, a Ruff provjere prolaze. Detalji: `docs/KORAK_11B2B_CRUD_KOLEKCIJE.md`.
+- Dodano je sedam izoliranih regresijskih testova; ciljna cjelina ima 99, puni suite 432 prolazna testa, a Ruff provjere prolaze. Detalji: `docs/KORAK_11B2B_CRUD_KOLEKCIJE.md`.

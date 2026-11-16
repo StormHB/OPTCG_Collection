@@ -85,11 +85,13 @@ async def update_entry(
 
 
 async def delete_entry(db: AsyncSession, entry: CollectionEntry) -> None:
-    await db.scalar(
+    locked_id = await db.scalar(
         select(CollectionEntry.id)
         .where(CollectionEntry.id == entry.id)
         .with_for_update()
     )
+    if locked_id is None:
+        raise AppError("not_found", "Zapis kolekcije nije pronaden", 404)
     lent = await card_loan_repo.outstanding_lent(db, entry.user_id, entry.printing_id)
     if lent:
         raise AppError(
