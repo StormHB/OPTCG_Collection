@@ -19,18 +19,35 @@ NewPassword = Annotated[
 
 
 class RegisterRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {"username": "luffy_01", "password": "sigurna-lozinka"}
+        },
+    )
 
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9_]+$")
     password: NewPassword
 
 
 class LoginRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {"username": "luffy_01", "password": "sigurna-lozinka"}
+        },
+    )
+
     username: str = Field(min_length=1, max_length=80)
     password: Password
 
 
 class RefreshRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"example": {"refresh_token": "<refresh-token>"}},
+    )
+
     refresh_token: str = Field(min_length=1)
 
 
