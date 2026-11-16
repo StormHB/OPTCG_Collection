@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje: 16. 11. 2026. — revizija backenda.** Funkcionalnosti do Koraka 10B (autentikacija, katalog, osobni filteri, kolekcije, Excel import, posudbe i statistika) implementirane su i spojene u `main`. Koraci 11A.1–11A.3 te regresijske cjeline 11B.1, 11B.2A i 11B.2B lokalno su provjereni na branchu `fix/backend-validation`. Slijede 11B.2C (Excel import) i 11B.2D (posudbe); Vue frontend dolazi tek nakon backend dijela.
+> **Stanje: 16. 11. 2026. — revizija backenda.** Funkcionalnosti do Koraka 10B (autentikacija, katalog, osobni filteri, kolekcije, Excel import, posudbe i statistika) implementirane su i spojene u `main`. Koraci 11A.1–11A.3 te regresijske cjeline 11B.1 i 11B.2A–11B.2C lokalno su provjereni na branchu `fix/backend-validation`. Sljedeći je Korak 11B.2D (posudbe); Vue frontend dolazi tek nakon backend dijela.
 
 ## Napredak
 
@@ -24,8 +24,8 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 11B.1 | Regresijska provjera filtera kataloga | ✅ Lokalno provjereno: 71 ciljani / 393 ukupno |
 | 11B.2A | Autentikacija, autorizacija i vlasništvo | ✅ Lokalno provjereno: 32 nova / 425 ukupno |
 | 11B.2B | CRUD osobne kolekcije i konkurentnost | ✅ Lokalno provjereno: 7 novih / 432 ukupno |
-| 11B.2C | Excel import | ⏳ Sljedeće |
-| 11B.2D | Posudbe | ⏳ Planirano |
+| 11B.2C | Excel import | ✅ Lokalno provjereno: 9 novih / 441 ukupno |
+| 11B.2D | Posudbe | ⏳ Sljedeće |
 | Kasnije | DON!!/varijante, Vue frontend, objava | Planirano |
 
 ## Tehnologije
@@ -232,7 +232,7 @@ Prije većeg upisa preporučuje se sigurnosna kopija baze. Privatne Excel datote
 
 **Korak 9B — API posudbi:** omogućeni su pregled, unos i djelomični/potpuni povrat. Ne može se posuditi više vlastitih primjeraka nego što je raspoloživo; aktivne posudbe štite od smanjivanja količine kroz PATCH, brisanje ili Excel `replace`. Posudba **ne mijenja vlasničku količinu** u `collection_entries`; tuđe posuđene karte **ne povećavaju vlastite playsetove**. Odgovori uključuju točan `printing_id`, kod, set i URL ilustracije za budući Vue prikaz. Dokumentacija: `docs/KORAK_09B_API_POSUDBI.md`.
 
-**Dalje:** Korak 11B.2C regresijski provjerava Excel import, a 11B.2D posudbe. Tek nakon backend cjeline planirati Vue frontend; dopune DON!! i alternativnih izdanja ostaju zasebni zadaci.
+**Dalje:** Korak 11B.2D regresijski provjerava posudbe. Zasebna prazna PostgreSQL testna baza ostaje obavezan završni dio backend revizije za stvarne paralelne transakcije, zaključavanje i rollback. Tek nakon backend cjeline planirati Vue frontend; dopune DON!! i alternativnih izdanja ostaju zasebni zadaci.
 
 Za nove datumsko-vremenske API podatke koristimo Pydantic `AwareDatetime`, normalizaciju na UTC (`datetime.now(timezone.utc)` i `.astimezone(timezone.utc)`), a lokalnu zonu samo za prikaz.
 
@@ -299,3 +299,11 @@ Ruff cleanup završen je prije Koraka 11A.2. Stroga validacija 11A.2 i ugovor HT
 - Ispravljen je race pri DELETE-u: ako zapis nestane prije zaključavanja, API vraća kontrolirani `404` bez loan upita ili ponovnog brisanja.
 - SQLite/mock testovi ne dokazuju stvarno raspoređivanje paralelnih PostgreSQL transakcija; potrebni scenariji i postojeća “zadnji commit pobjeđuje” PATCH semantika dokumentirani su zasebno.
 - Dodano je sedam izoliranih regresijskih testova; ciljna cjelina ima 99, puni suite 432 prolazna testa, a Ruff provjere prolaze. Detalji: `docs/KORAK_11B2B_CRUD_KOLEKCIJE.md`.
+
+### Korak 11B.2C — Excel import
+
+- Ponovno su provjereni vlasništvo, `.xlsx` validacija, preview/apply ugovor, `replace`/`add`, napomene, stale stanje i zaštita aktivnih posudbi.
+- `plan_token` je vezan uz datoteku, način, korisnika i relevantno stanje; nije JWT i nema vremenski rok u aktualnom API ugovoru.
+- Dodatno su provjereni oštećeni upload bez curenja detalja, izmijenjeni token, promjena kolekcije između previewa i applyja, ponovljeni svježi `add`, DON!! bez ID-a te redoslijed `FOR UPDATE → loan upit`.
+- SQLite/mock testovi ne dokazuju stvarno raspoređivanje paralelnih PostgreSQL transakcija; potrebni integracijski scenariji dokumentirani su u `docs/KORAK_11B2C_EXCEL_IMPORT.md`.
+- Dodano je devet regresijskih testova, uključujući HTTP tok `preview → promjena kolekcije → apply starim tokenom`; ciljana cjelina ima 61, puni suite 441 prolazni test, a Ruff provjere prolaze.

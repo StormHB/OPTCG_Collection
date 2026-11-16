@@ -3,6 +3,7 @@
 import asyncio
 from io import BytesIO
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -10,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 from sqlalchemy import create_engine, select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -469,3 +471,231 @@ def test_api_preview_then_apply_with_matching_token(catalog):
         for e in session.scalars(select(CollectionEntry)).all()
     }
     assert rows == {orig.id: 3, reprint.id: 2}
+
+
+def test_api_apply_rejects_other_user_before_reading_spreadsheet():
+    app = FastAPI()
+    app.include_router(collections_router, prefix="/collections")
+    app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
+
+    async def dummy_db():
+        yield object()
+
+    app.dependency_overrides[get_db] = dummy_db
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=7, role="admin", is_active=True
+    )
+    with patch(
+        "app.routers.collection_import._read_upload", new_callable=AsyncMock
+    ) as read:
+        response = TestClient(app).post(
+            "/collections/8/import/apply",
+            params={"plan_token": "a" * 64},
+            files={"file": ("my.xlsx", b"not-read", "application/octet-stream")},
+        )
+    assert response.status_code == 403
+    assert response.json()["code"] == "forbidden"
+    read.assert_not_awaited()
+
+
+def test_corrupted_xlsx_returns_safe_422_without_apply():
+    app = FastAPI()
+    app.include_router(collections_router, prefix="/collections")
+    app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
+
+    async def dummy_db():
+        yield object()
+
+    app.dependency_overrides[get_db] = dummy_db
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=7, role="user", is_active=True
+    )
+    with patch(
+        "app.routers.collection_import.apply_plan", new_callable=AsyncMock
+    ) as apply:
+        response = TestClient(app).post(
+            "/collections/7/import/apply",
+            params={"plan_token": "a" * 64},
+            files={
+                "file": ("broken.xlsx", b"PK-corrupted", "application/octet-stream")
+            },
+        )
+    assert response.status_code == 422
+    assert response.json()["code"] == "invalid_excel"
+    assert "traceback" not in response.text.lower()
+    assert "zipfile" not in response.text.lower()
+    apply.assert_not_awaited()
+
+
+def test_plan_token_is_bound_to_user(catalog):
+    session, owner, other, *_ = catalog
+    db = DbAdapter(session)
+    data = excel_bytes()
+    owner_plan = run(build_plan(db, owner.id, data, "list.xlsx", "replace"))
+    other_plan = run(build_plan(db, other.id, data, "list.xlsx", "replace"))
+    assert owner_plan.token != other_plan.token
+    with pytest.raises(AppError) as raised:
+        run(apply_plan(db, other_plan, owner_plan.token))
+    assert raised.value.status_code == 409
+    assert raised.value.code == "stale_import_preview"
+    assert session.scalars(select(CollectionEntry)).all() == []
+
+
+def test_modified_well_formed_plan_token_is_rejected_without_write(catalog):
+    session, owner, *_ = catalog
+    db = DbAdapter(session)
+    plan = run(build_plan(db, owner.id, excel_bytes(), "list.xlsx", "replace"))
+    replacement = "0" if plan.token[-1] != "0" else "1"
+    modified = plan.token[:-1] + replacement
+    with pytest.raises(AppError) as raised:
+        run(apply_plan(db, plan, modified))
+    assert raised.value.status_code == 409
+    assert raised.value.code == "stale_import_preview"
+    assert session.scalars(select(CollectionEntry)).all() == []
+
+
+def test_changed_collection_state_rejects_preview_token_without_overwrite(catalog):
+    session, owner, _, orig, *_ = catalog
+    db = DbAdapter(session)
+    data = excel_bytes(op01=3)
+    preview = run(build_plan(db, owner.id, data, "list.xlsx", "replace"))
+    session.add(
+        CollectionEntry(user_id=owner.id, printing_id=orig.id, quantity=9, note="new")
+    )
+    session.commit()
+    current_plan = run(build_plan(db, owner.id, data, "list.xlsx", "replace"))
+    with pytest.raises(AppError) as raised:
+        run(apply_plan(db, current_plan, preview.token))
+    assert raised.value.status_code == 409
+    assert raised.value.code == "stale_import_preview"
+    stored = session.scalar(select(CollectionEntry))
+    assert (stored.quantity, stored.note) == (9, "new")
+
+
+def test_api_rejects_old_preview_after_collection_changes(catalog):
+    session, owner, _, orig, *_ = catalog
+    app = FastAPI()
+    app.include_router(collections_router, prefix="/collections")
+    app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
+
+    async def dummy_db():
+        yield DbAdapter(session)
+
+    app.dependency_overrides[get_db] = dummy_db
+    app.dependency_overrides[get_current_user] = lambda: owner
+    client = TestClient(app)
+    data = excel_bytes(op01=3, prb01=None)
+    upload = {
+        "file": (
+            "my.xlsx",
+            data,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    }
+    preview = client.post(
+        f"/collections/{owner.id}/import/preview",
+        params={"mode": "replace"},
+        files=upload,
+    )
+    assert preview.status_code == 200, preview.text
+
+    session.add(
+        CollectionEntry(
+            user_id=owner.id,
+            printing_id=orig.id,
+            quantity=9,
+            note="novije stanje",
+        )
+    )
+    session.commit()
+
+    applied = client.post(
+        f"/collections/{owner.id}/import/apply",
+        params={"mode": "replace", "plan_token": preview.json()["plan_token"]},
+        files=upload,
+    )
+    assert applied.status_code == 409
+    assert applied.json()["code"] == "stale_import_preview"
+    stored = session.scalar(
+        select(CollectionEntry).where(
+            CollectionEntry.user_id == owner.id,
+            CollectionEntry.printing_id == orig.id,
+        )
+    )
+    assert (stored.quantity, stored.note) == (9, "novije stanje")
+
+
+def test_add_with_fresh_preview_can_accumulate_again(catalog):
+    session, owner, _, orig, *_ = catalog
+    db = DbAdapter(session)
+    data = excel_bytes(op01=3, prb01=None)
+    first = run(build_plan(db, owner.id, data, "list.xlsx", "add"))
+    run(apply_plan(db, first, first.token))
+    session.commit()
+    second = run(build_plan(db, owner.id, data, "list.xlsx", "add"))
+    run(apply_plan(db, second, second.token))
+    session.commit()
+    stored = session.scalar(
+        select(CollectionEntry).where(CollectionEntry.printing_id == orig.id)
+    )
+    assert stored.quantity == 6
+    assert stored.note == "Za deck"
+
+
+def test_don_sheet_requires_exact_printing_id(catalog):
+    session, owner, *_ = catalog
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "DON!!"
+    ws.append(["Broj karte", "Količina", "ID izdanja"])
+    ws.append(["DON-001", 10, None])
+    out = BytesIO()
+    wb.save(out)
+    wb.close()
+    plan = run(
+        build_plan(DbAdapter(session), owner.id, out.getvalue(), "don.xlsx", "replace")
+    )
+    assert plan.summary()["can_apply"] is False
+    assert any(issue.code == "missing_printing_id" for issue in plan.issues)
+    with pytest.raises(AppError) as raised:
+        run(apply_plan(DbAdapter(session), plan, plan.token))
+    assert raised.value.status_code == 422
+    assert session.scalars(select(CollectionEntry)).all() == []
+
+
+def test_apply_locks_existing_rows_before_rechecking_active_loans(catalog):
+    session, owner, _, orig, *_ = catalog
+    session.add(
+        CollectionEntry(user_id=owner.id, printing_id=orig.id, quantity=5, note="old")
+    )
+    session.commit()
+
+    class RecordingDb(DbAdapter):
+        def __init__(self, db_session):
+            super().__init__(db_session)
+            self.events = []
+            self.lock_statement = None
+
+        async def scalars(self, query):
+            sql = str(query.compile(dialect=postgresql.dialect()))
+            if "FOR UPDATE" in sql:
+                self.events.append("lock")
+                self.lock_statement = query
+            return await super().scalars(query)
+
+        async def execute(self, query):
+            sql = str(query.compile(dialect=postgresql.dialect()))
+            if "card_loans" in sql and "sum" in sql.lower():
+                self.events.append("loans")
+            return await super().execute(query)
+
+    db = RecordingDb(session)
+    data = excel_bytes(op01=3, prb01=None)
+    plan = run(build_plan(db, owner.id, data, "list.xlsx", "replace"))
+    db.events.clear()
+    run(apply_plan(db, plan, plan.token))
+    assert db.events[:2] == ["lock", "loans"]
+    assert "FOR UPDATE" in str(db.lock_statement.compile(dialect=postgresql.dialect()))
