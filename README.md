@@ -23,7 +23,8 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 11A.3 | Provjera HTTP kodova i poruka | ⏳ Sljedeće |
 | 11B.1 | Regresijska provjera filtera kataloga | ✅ Lokalno provjereno: 71 ciljani / 393 ukupno |
 | 11B.2A | Autentikacija, autorizacija i vlasništvo | ✅ Lokalno provjereno: 32 nova / 425 ukupno |
-| 11B.2B+ | Regresijska provjera ostalih API ruta | ⏳ Planirano |
+| 11B.2B | CRUD osobne kolekcije i konkurentnost | ✅ Lokalno provjereno: 6 novih / 431 ukupno |
+| 11B.2C+ | Regresijska provjera ostalih API ruta | ⏳ Planirano |
 | Kasnije | DON!!/varijante, Vue frontend, objava | Planirano |
 
 ## Tehnologije
@@ -289,3 +290,10 @@ Ruff cleanup završen je prije Koraka 11A.2. Korak 11A.2 pripremljen je za lokal
 - Potvrđeno je da se administratorska uloga čita iz aktualnog zapisa baze, a administrator nema automatski pristup tuđoj osobnoj kolekciji.
 - Promjena `user_id` u URL-u ili queryju ne može zaobići vlasništvo; osobni filteri koriste samo identitet iz JWT-a.
 - Nova matrica ima 32 izolirana testa; puni suite ima 425 prolaznih testova, a Ruff provjere prolaze. Detalji su u `docs/KORAK_11B2A_AUTORIZACIJA.md`.
+
+### Korak 11B.2B — CRUD osobne kolekcije
+
+- Ponovno su provjereni POST, GET, PATCH i DELETE ugovori, granice količine, parcijalne izmjene, vlasništvo i zaštita aktivnih posudbi.
+- Dodatno su potvrđeni DB unique constraint i sigurni `409` fallback za istodobno stvaranje duplikata te PostgreSQL `FOR UPDATE` u PATCH/DELETE putu.
+- SQLite/mock testovi ne dokazuju stvarno raspoređivanje paralelnih PostgreSQL transakcija; potrebni scenariji i postojeća “zadnji commit pobjeđuje” PATCH semantika dokumentirani su zasebno.
+- Dodano je šest izoliranih regresijskih testova; ciljna cjelina ima 98, puni suite 431 prolazni test, a Ruff provjere prolaze. Detalji: `docs/KORAK_11B2B_CRUD_KOLEKCIJE.md`.
