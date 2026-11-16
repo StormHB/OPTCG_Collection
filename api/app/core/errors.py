@@ -17,6 +17,7 @@ async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={"code": exc.code, "message": exc.message},
+        headers={"WWW-Authenticate": "Bearer"} if exc.status_code == 401 else None,
     )
 
 
@@ -40,12 +41,38 @@ async def validation_error_handler(
 async def http_exception_handler(
     _request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
-    error_codes = {404: "not_found", 405: "method_not_allowed"}
+    error_codes = {
+        400: "bad_request",
+        401: "invalid_credentials",
+        403: "forbidden",
+        404: "not_found",
+        405: "method_not_allowed",
+        413: "payload_too_large",
+    }
+    headers = dict(exc.headers or {})
+    if exc.status_code == 401:
+        headers.setdefault("WWW-Authenticate", "Bearer")
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "code": error_codes.get(exc.status_code, "http_error"),
             "message": str(exc.detail),
         },
-        headers=getattr(exc, "headers", None),
+        headers=headers or None,
+    )
+
+
+async def unexpected_error_handler(request: Request, _exc: Exception) -> JSONResponse:
+    """Siguran, dosljedan 500; detalji pogreške ostaju samo u logu."""
+    import logging
+
+    logging.getLogger(__name__).exception(
+        "Neocekivana API pogreska: %s %s", request.method, request.url.path
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": "internal_server_error",
+            "message": "Doslo je do interne pogreske posluzitelja",
+        },
     )

@@ -25,9 +25,11 @@ async def _read_upload(file: UploadFile) -> bytes:
         content = await file.read(MAX_UPLOAD_BYTES + 1)
     finally:
         await file.close()
-    if not content or len(content) > MAX_UPLOAD_BYTES:
+    if not content:
+        raise AppError("invalid_excel", "Excel datoteka ne smije biti prazna", 422)
+    if len(content) > MAX_UPLOAD_BYTES:
         raise AppError(
-            "invalid_excel", "Excel ne smije biti prazan ili veći od 6 MB", 422
+            "excel_too_large", "Excel datoteka ne smije biti veća od 6 MB", 413
         )
     return content
 

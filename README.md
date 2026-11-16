@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje: 13. 11. 2026. — Korak 10B u provjeri.** Autentikacija, katalog, Excel import i posudbe završeni su; Korak 10A potvrđen je na stvarnoj kolekciji (2.133 primjerka, 662 izdanja, 285 playsetova). Korak 10B dodaje osobne filtere na javni katalog. Nakon lokalnih testova, Swagger provjere, commita i pusha slijedi PR za `feat/collection-stats`.
+> **Stanje: 16. 11. 2026. — revizija backenda.** Funkcionalnosti do Koraka 10B (autentikacija, katalog, osobni filteri, kolekcije, Excel import, posudbe i statistika) implementirane su i spojene u `main`. Korak 11A.1 (numerički filteri, Counter dropdown i Ruff cleanup) lokalno je provjeren i committan na `fix/backend-validation`. Korak 11A.2 (stroga JSON validacija) pripremljen je za lokalnu provjeru; zatim slijede 11A.3 i 11B. Vue frontend dolazi tek nakon backend dijela.
 
 ## Napredak
 
@@ -15,10 +15,14 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 08A | CRUD osobne kolekcije | ✅ |
 | 08B | Excel import (`preview` / `apply`) | ✅ |
 | 09A | Model posudbi i migracija `004` | ✅ |
-| 09B | API posudbi, dostupnost i djelomična vraćanja | ✅ 180 testova i ručne provjere |
-| 10A | Statistika kolekcije i playsetova (read-only API) | ✅ SQL i Swagger provjereni |
-| 10B | Filteri `owned`, `missing`, `playset` | Implementirano; testovi i Swagger na lokalnom projektu prije commita |
-| Dalje | DON!!/varijante, Vue frontend, završno testiranje i objava | Planirano |
+| 09B | API posudbi, dostupnost i djelomična vraćanja | ✅ |
+| 10A | Statistika kolekcije i playsetova (read-only API) | ✅ |
+| 10B | Filteri `owned`, `missing`, `playset` i aliasi setova | ✅ Spojeno u `main` |
+| 11A.1 | Numerički filteri, Counter dropdown i Ruff cleanup | ✅ Lokalno provjereno; commitano |
+| 11A.2 | Stroga validacija JSON zahtjeva | 🔄 Pripremljeno; čeka lokalnu provjeru |
+| 11A.3 | Provjera HTTP kodova i poruka | ⏳ Sljedeće |
+| 11B | Regresijska provjera svih filtera i API ruta | ⏳ Planirano |
+| Kasnije | DON!!/varijante, Vue frontend, objava | Planirano |
 
 ## Tehnologije
 
@@ -113,7 +117,9 @@ Za popis ruta i primjere zahtjeva koristi Swagger. Trenutačno su implementirane
 GET /cards?colors=red&colors=yellow&sets=op01&limit=20&offset=0
 ```
 
-Dostupni su filteri za boju, tip, cijenu, snagu, atribut, counter, blok, keyword, archetype, set, rijetkost i varijantu. Izdanje/set/rarity/variant/block moraju se podudarati na istom printingu. `counter_values=none` označava odsutnu tiskanu Counter vrijednost, ne broj `0` ili keyword `[Counter]`.
+Dostupni su filteri za boju, tip, cijenu (`costs` 0–10), snagu (`powers` 0–13000), atribut, Counter, blok, keyword, archetype, set, rijetkost i varijantu. Filteri za set, rarity, variant i block primjenjuju se na **isto fizičko izdanje**. **Counter dropdown** (`counter_values`) prihvaća samo `0`, `1000` i `2000`; za karte bez tiskane Counter vrijednosti (`NULL`) koristi se zaseban `counter_missing=true`. `counter_values=none` više nije podržan i vraća `422`. Counter `0` nije isto što i `NULL` niti keyword `[Counter]`.
+
+Za više vrijednosti ponovi isti query parametar (npr. `colors=red&colors=yellow`). `GET /cards` vraća osnovne karte, dok osobna statistika broji fizička izdanja.
 
 **Alias za oznake setova (10B):** filter `sets` i tekstualna pretraga `search` prihvaćaju `OP01` i `OP-01` (uključujući `op01`, `op-01` i rubne razmake). Isto vrijedi za `EB`, `ST` i `PRB` (`EB-03` = `EB03`). Baza ostaje u kanonskom formatu bez dodatne crtice, a puni kod karte poput `OP01-016` ostaje nepromijenjen.
 
@@ -191,8 +197,8 @@ Provjera količina u PostgreSQL-u:
 
 ```sql
 SELECT user_id,
-       COUNT(*) AS razlicitih_izdanja,
-       COALESCE(SUM(quantity), 0) AS ukupno_primjeraka
+       COUNT(*) FILTER (WHERE quantity > 0) AS razlicitih_izdanja,
+       COALESCE(SUM(quantity) FILTER (WHERE quantity > 0), 0) AS ukupno_primjeraka
 FROM collection_entries
 GROUP BY user_id
 ORDER BY user_id;
@@ -203,7 +209,6 @@ Uvoznici kataloga (iz mape `api/`; pregled bez upisa pa potvrda):
 ```powershell
 python -m app.import_catalog --file ..\data\catalog_from_excel.csv
 python -m app.import_catalog --file ..\data\catalog_from_excel.csv --apply
-
 python -m app.enrich_catalog --download
 python -m app.enrich_catalog
 python -m app.enrich_catalog --apply
@@ -223,7 +228,7 @@ Prije većeg upisa preporučuje se sigurnosna kopija baze. Privatne Excel datote
 
 **Korak 9B — API posudbi:** omogućeni su pregled, unos i djelomični/potpuni povrat. Ne može se posuditi više vlastitih primjeraka nego što je raspoloživo; aktivne posudbe štite od smanjivanja količine kroz PATCH, brisanje ili Excel `replace`. Posudba **ne mijenja vlasničku količinu** u `collection_entries`; tuđe posuđene karte **ne povećavaju vlastite playsetove**. Odgovori uključuju točan `printing_id`, kod, set i URL ilustracije za budući Vue prikaz. Dokumentacija: `docs/KORAK_09B_API_POSUDBI.md`.
 
-**Dalje:** lokalna provjera 10B, commit/push i PR `feat/collection-stats` → `main`; zatim DON!!/alternativna izdanja i Vue sučelje.
+**Dalje:** lokalno potvrditi 11A.2, zatim završiti 11A.3 (HTTP statusi i poruke) i 11B (regresijska provjera svih filtera i poslovnih pravila). Tek nakon backend cjeline planirati Vue frontend; dopune DON!! i alternativnih izdanja ostaju zasebni zadaci.
 
 Za nove datumsko-vremenske API podatke koristimo Pydantic `AwareDatetime`, normalizaciju na UTC (`datetime.now(timezone.utc)` i `.astimezone(timezone.utc)`), a lokalnu zonu samo za prikaz.
 
@@ -239,11 +244,11 @@ python -m ruff format --check .
 alembic current
 ```
 
-Na kraju svakog testiranog koraka ažuriramo dokumentaciju te radimo **commit i push**. Pull Request u `main` radimo po završetku funkcionalne cjeline. Koraci 10A i 10B razvijaju se na branchu `feat/collection-stats`, nastalom nakon mergea `feat/card-loans` u `main`.
+Na kraju svakog testiranog koraka ažuriramo dokumentaciju te radimo **commit i push**. Pull Request u `main` radimo po završetku funkcionalne cjeline. Koraci 10A i 10B završeni su i spojeni u `main`; backend reviziju 11A/11B radimo na branchu `fix/backend-validation`.
 
 Prije commita provjeriti `git status`, `git diff --cached --stat` i `git diff --cached --check`; nikad ne commitati `.env`, tajne, osobne `.xlsx`, `backups/`, preuzete snapshotove ni `.venv/`.
 
-Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI.md`. Korak 10A: `docs/KORAK_10A_STATISTIKA_KOLEKCIJE.md`. Korak 10B: `docs/KORAK_10B_FILTERI_KOLEKCIJE.md`.
+Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI.md`. Korak 10A: `docs/KORAK_10A_STATISTIKA_KOLEKCIJE.md`. Korak 10B: `docs/KORAK_10B_FILTERI_KOLEKCIJE.md`. Korak 11A.1: `docs/KORAK_11A1_NUMERICKI_FILTERI.md` i `docs/KORAK_11A_RUFF_CLEANUP.md`.
 
 ### Backend revizija — Ruff cleanup
 
@@ -255,4 +260,16 @@ Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI
 - Ruff format: sve datoteke pravilno formatirane.
 - Pytest: 243 uspješna testa.
 
-Sljedeći korak: stroga validacija JSON zahtjeva i dosljedni HTTP kodovi.
+Ruff cleanup završen je prije Koraka 11A.2. Korak 11A.2 pripremljen je za lokalnu potvrdu, nakon čega slijedi provjera HTTP kodova i poruka.
+
+### Korak 11A.2 — stroga validacija JSON zahtjeva
+
+- Svi request-body modeli za autentikaciju, kolekcije i posudbe odbijaju nepoznata JSON polja (`extra="forbid"`).
+- ID-jevi i količine u zahtjevima za kolekciju/posudbe moraju biti stvarni cijeli brojevi; stringovi, decimalni brojevi i `true`/`false` nisu dopušteni kao zamjena.
+- Prazne napomene nisu dopuštene: `note=null` služi za brisanje; izostavljeno polje kod `PATCH` ostaje nepromijenjeno.
+- JSON datumi posudbi moraju biti ISO 8601 stringovi s vremenskom zonom. Ime osobe ne smije biti prazno.
+- Neispravni zahtjevi vraćaju `422` i `code="validation_error"`, bez poziva servisa.
+- Regresijski testovi: `api/tests/test_request_body_validation.py`. Detalji: `docs/KORAK_11A2_STROGA_JSON_VALIDACIJA.md`.
+- Nema nove migracije; Alembic ostaje na `004 (head)`.
+
+**Stanje provjere 11A.2:** 306/306 testova na izoliranoj kopiji projekta. Za posljednje promjene još se čekaju korisnička lokalna potvrda punog `pytest` skupa, Ruff provjere i commit. Posljednji potvrđeni lokalni rezultat prije 11A.2 bio je 243/243 testova uz nula Ruff grešaka i `004 (head)`.
