@@ -228,11 +228,16 @@ def test_list_filter_direction_and_active_only():
         return_value=[loan_stub(returned=2)],
     ) as read:
         response = make_client().get(
-            "/collections/7/loans?direction=lent&active_only=true"
+            "/collections/7/loans?direction=lent&active_only=true&limit=10&offset=10"
         )
         assert response.status_code == 200
         assert response.json()[0]["outstanding_quantity"] == 3
-        assert read.await_args.kwargs == {"direction": "lent", "active_only": True}
+        assert read.await_args.kwargs == {
+            "direction": "lent",
+            "active_only": True,
+            "limit": 10,
+            "offset": 10,
+        }
 
 
 def test_list_invalid_direction_422():
@@ -241,7 +246,7 @@ def test_list_invalid_direction_422():
 
 def test_list_other_user_403_without_query():
     with patch.object(card_loan_repo, "list_for_owner", new_callable=AsyncMock) as read:
-        response = make_client().get("/collections/8/loans")
+        response = make_client().get("/collections/8/loans?limit=1&offset=1")
         assert response.status_code == 403
         read.assert_not_awaited()
 

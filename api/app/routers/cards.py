@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_db
+from app.core.deps import db_session_dependency
 from app.core.errors import AppError
 from app.core.optional_auth import get_collection_filter_user
 from app.models.user import User
@@ -62,7 +62,7 @@ async def list_cards(
             "Zahtijeva JWT access token; koristi isključivo prijavljenog korisnika."
         ),
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User | None = Depends(get_collection_filter_user),
 ) -> CardPageResponse:
     """Ponovljeni parametri = OR, različite kategorije = AND.
@@ -100,7 +100,7 @@ async def list_cards(
 
 @router.get("/filters", response_model=CardFilterOptionsResponse)
 async def list_card_filters(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
 ) -> CardFilterOptionsResponse:
     """Dostupne opcije za filtere; mora stajati prije /{card_id}."""
     return await card_service.get_card_filters(db)
@@ -113,7 +113,7 @@ async def list_card_filters(
 )
 async def read_card(
     card_id: int = Path(ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
 ) -> CardDetailResponse:
     """Javni detalji jedne karte sa svim dostupnim izdanjima."""
     return await card_service.get_card_detail(db, card_id=card_id)

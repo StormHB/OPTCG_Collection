@@ -1,7 +1,7 @@
 """Korak 11A.3: dosljedni HTTP statusi, sigurne poruke i excel upload."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -17,6 +17,7 @@ from app.core.errors import (
     unexpected_error_handler,
     validation_error_handler,
 )
+from app.core.jwt import create_access_token
 from app.main import create_app
 from app.routers.collection_import import router as import_router
 
@@ -117,6 +118,48 @@ def test_unexpected_500_does_not_expose_internal_error_or_traceback():
     }
     assert "SECRET_SHOULD_NOT_LEAK" not in response.text
     assert "Traceback" not in response.text
+
+
+@pytest.mark.parametrize("commit_fails", [False, True], ids=["commit", "rollback"])
+def test_collection_create_response_reflects_transaction_outcome(commit_fails):
+    session = MagicMock()
+    session.get = AsyncMock(
+        return_value=SimpleNamespace(id=7, role="user", is_active=True)
+    )
+    session.scalar = AsyncMock(side_effect=[13, None])
+
+    def assign_entry_id():
+        session.add.call_args.args[0].id = 21
+
+    session.flush = AsyncMock(side_effect=assign_entry_id)
+    session.commit = AsyncMock(
+        side_effect=RuntimeError("simulated commit failure") if commit_fails else None
+    )
+    session.rollback = AsyncMock()
+    session_context = MagicMock()
+    session_context.__aenter__.return_value = session
+
+    client = TestClient(create_app(), raise_server_exceptions=False)
+    token = create_access_token(7, "user")
+    with patch(
+        "app.core.deps.AsyncSessionLocal", return_value=session_context
+    ) as factory:
+        response = client.post(
+            "/collections/7/entries",
+            json={"printing_id": 13, "quantity": 4},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    factory.assert_called_once_with()
+    if commit_fails:
+        assert session.mock_calls[-3:] == [call.flush(), call.commit(), call.rollback()]
+        assert response.status_code == 500
+        assert response.json()["code"] == "internal_server_error"
+        assert "simulated commit failure" not in response.text
+    else:
+        assert session.mock_calls[-2:] == [call.flush(), call.commit()]
+        assert response.status_code == 201
+        assert response.json()["id"] == 21
 
 
 def import_client() -> TestClient:

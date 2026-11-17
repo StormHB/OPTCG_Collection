@@ -82,6 +82,8 @@ async def list_for_owner(
     *,
     direction: str | None = None,
     active_only: bool = False,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[CardLoan]:
     statement = (
         select(CardLoan)
@@ -93,7 +95,7 @@ async def list_for_owner(
         statement = statement.where(CardLoan.direction == direction)
     if active_only:
         statement = statement.where(CardLoan.quantity_returned < CardLoan.quantity)
-    return list((await db.scalars(statement)).all())
+    return list((await db.scalars(statement.limit(limit).offset(offset))).all())
 
 
 async def flush(db: AsyncSession) -> None:

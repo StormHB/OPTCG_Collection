@@ -24,13 +24,17 @@ async def get_db() -> AsyncIterator[AsyncSession]:
             raise
 
 
+# Dovrsi transakciju prije nego FastAPI posalje odgovor klijentu.
+db_session_dependency = Depends(get_db, scope="function")
+
+
 # auto_error=False: sami vracamo dosljedan oblik pogreske (code, message).
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
 ) -> User:
     if credentials is None:
         raise AppError("invalid_credentials", "Nedostaje access token", 401)

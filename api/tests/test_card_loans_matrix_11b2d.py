@@ -105,6 +105,42 @@ def run(coroutine):
     return asyncio.run(coroutine)
 
 
+def test_loan_repository_paginates_after_owner_and_loan_filters(loan_db):
+    db, session, owner, other, printing, _, first, second = loan_db
+    session.add_all(
+        [
+            CardLoan(
+                user_id=other.id,
+                printing_id=printing.id,
+                direction="lent",
+                person_name="Drugi vlasnik",
+                quantity=1,
+                quantity_returned=0,
+                loaned_at=second.loaned_at,
+            ),
+            CardLoan(
+                user_id=owner.id,
+                printing_id=printing.id,
+                direction="lent",
+                person_name="Vracena posudba",
+                quantity=1,
+                quantity_returned=1,
+                loaned_at=second.loaned_at,
+            ),
+        ]
+    )
+    first.loaned_at = second.loaned_at
+    session.commit()
+
+    for offset, expected in enumerate(([second.id], [first.id], [])):
+        page = run(
+            card_loan_repo.list_for_owner(
+                db, owner.id, direction="lent", active_only=True, limit=1, offset=offset
+            )
+        )
+        assert [loan.id for loan in page] == expected
+
+
 def _new_lent(printing_id, quantity):
     return CardLoanCreate(
         printing_id=printing_id,

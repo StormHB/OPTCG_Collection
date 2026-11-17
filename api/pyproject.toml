@@ -15,3 +15,8 @@ select = ["E", "W", "F", "I"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+markers = [
+    "postgres: testovi koji zahtijevaju zasebni db_test PostgreSQL servis",
+]

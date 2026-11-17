@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, get_db
+from app.core.deps import db_session_dependency, get_current_user
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
@@ -24,14 +24,14 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     responses=error_responses(409, 422),
 )
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(body: RegisterRequest, db: AsyncSession = db_session_dependency):
     return await auth_service.register_user(db, body.username, body.password)
 
 
 @router.post(
     "/login", response_model=TokenResponse, responses=error_responses(401, 422)
 )
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(body: LoginRequest, db: AsyncSession = db_session_dependency):
     user = await auth_service.authenticate_user(db, body.username, body.password)
     access, refresh = auth_service.create_tokens(user)
     return TokenResponse(access_token=access, refresh_token=refresh)
@@ -40,7 +40,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 @router.post(
     "/refresh", response_model=TokenResponse, responses=error_responses(401, 422)
 )
-async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh(body: RefreshRequest, db: AsyncSession = db_session_dependency):
     access, refresh = await auth_service.refresh_tokens(db, body.refresh_token)
     return TokenResponse(access_token=access, refresh_token=refresh)
 

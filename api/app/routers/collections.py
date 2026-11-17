@@ -1,9 +1,9 @@
 """Privatni API za pregled i uređivanje osobne kolekcije."""
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, get_db
+from app.core.deps import db_session_dependency, get_current_user
 from app.models.user import User
 from app.routers.card_loans import router as card_loans_router
 from app.routers.collection_import import router as collection_import_router
@@ -26,11 +26,15 @@ router = APIRouter()
 )
 async def get_collection(
     user_id: int = Path(ge=1),
-    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=2_147_483_647),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     """Dohvati korisnikove zapise, ali samo ako je prijavljen kao vlasnik."""
-    return await collection_service.get_user_collection(db, current_user, user_id)
+    return await collection_service.get_user_collection(
+        db, current_user, user_id, limit=limit, offset=offset
+    )
 
 
 @router.get(
@@ -41,7 +45,7 @@ async def get_collection(
 )
 async def get_collection_stats(
     user_id: int = Path(ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     """Ukupne količine, broj različitih izdanja i dovršeni playsetovi."""
@@ -59,7 +63,7 @@ async def get_collection_stats(
 async def add_collection_entry(
     body: CollectionEntryCreate,
     user_id: int = Path(ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     """Dodaj fizičko izdanje u vlastitu kolekciju."""
@@ -77,7 +81,7 @@ async def update_collection_entry(
     body: CollectionEntryUpdate,
     user_id: int = Path(ge=1),
     printing_id: int = Path(ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     """Ažuriraj quantity i/ili note jednog izdanja."""
@@ -94,7 +98,7 @@ async def update_collection_entry(
 async def delete_collection_entry(
     user_id: int = Path(ge=1),
     printing_id: int = Path(ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ) -> Response:
     """Ukloni zapis iz svoje kolekcije, bez brisanja karte iz kataloga."""

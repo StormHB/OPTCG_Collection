@@ -92,3 +92,33 @@ def test_create_update_delete_preserves_catalog_and_other_users():
         assert session.scalars(select(CardPrinting)).all() == [printing]
         assert session.scalars(select(Card)).all() == [card]
     engine.dispose()
+
+
+def test_collection_repository_paginates_only_the_requested_owner():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        card_set = CardSet(code="OP01", name="OP01", sort_order=1)
+        card = Card(code="OP01-016", name="Nami", original_set=card_set)
+        first = CardPrinting(card=card, product_set=card_set, variant_code="regular")
+        second = CardPrinting(card=card, product_set=card_set, variant_code="alt")
+        owner = User(username="owner", password_hash="unused", role="user")
+        other = User(username="other", password_hash="unused", role="user")
+        session.add_all([first, second, owner, other])
+        session.flush()
+        session.add_all(
+            [
+                CollectionEntry(user_id=owner.id, printing_id=first.id, quantity=1),
+                CollectionEntry(user_id=other.id, printing_id=first.id, quantity=1),
+                CollectionEntry(user_id=owner.id, printing_id=second.id, quantity=2),
+            ]
+        )
+        session.commit()
+
+        db = AsyncAdapter(session)
+        for offset, expected in enumerate(([first.id], [second.id], [])):
+            page = asyncio.run(
+                collection_repo.list_for_user(db, owner.id, limit=1, offset=offset)
+            )
+            assert [entry.printing_id for entry in page] == expected
+    engine.dispose()

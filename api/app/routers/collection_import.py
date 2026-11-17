@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, get_db
+from app.core.deps import db_session_dependency, get_current_user
 from app.core.errors import AppError
 from app.models.user import User
 from app.schemas.collection_import import (
@@ -48,7 +48,7 @@ async def preview_collection_import(
     file: Annotated[UploadFile, File(description="Excel s osobnim količinama")],
     user_id: int = Path(ge=1),
     mode: Literal["replace", "add"] = Query(default="replace"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     """Ne mijenja bazu. Vraća preview i token za identičan idući apply."""
@@ -76,7 +76,7 @@ async def apply_collection_import(
         ),
     ),
     mode: Literal["replace", "add"] = Query(default="replace"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     """Primjena u jednoj transakciji, samo ako preview još odgovara stanju baze."""

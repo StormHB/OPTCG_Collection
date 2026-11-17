@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje: 16. 11. 2026. — revizija backenda.** Funkcionalnosti do Koraka 10B (autentikacija, katalog, osobni filteri, kolekcije, Excel import, posudbe i statistika) implementirane su i spojene u `main`. Koraci 11A.1–11A.3, regresijske cjeline 11B.1 i 11B.2A–11B.2D te završna OpenAPI revizija 11B.3 lokalno su provjereni na branchu `fix/backend-validation`. Sljedeći obavezni korak je 11C: zasebna PostgreSQL testna baza za paralelne transakcije, zaključavanje i rollback; Vue frontend dolazi tek nakon backend dijela.
+> **Stanje 17. 11. 2026. — revizija backenda.** Funkcionalnosti do koraka 10B spojene su u `main`. Na grani `fix/backend-validation` su revizije 11A i 11B, straničenje kolekcije i posudbi te potvrđena izolirana PostgreSQL baza. U 11C.2 dodane su prve regresije paralelnih transakcija.
 
 ## Napredak
 
@@ -27,7 +27,8 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 11B.2C | Excel import | ✅ Lokalno provjereno: 9 novih / 441 ukupno |
 | 11B.2D | Posudbe | ✅ Lokalno provjereno: 7 novih / 448 ukupno |
 | 11B.3 | API rute, Swagger/OpenAPI i HTTP ugovor | ✅ Lokalno provjereno: 8 novih / 456 ukupno |
-| 11C | Izolirana PostgreSQL testna baza i stvarna konkurentnost | ⏳ Sljedeće — obavezno prije PR-a |
+| 11C.1 | Trajna izolirana PostgreSQL testna baza | ✅ Potvrđene 3 provjere i ciklus `004 → 003 → 004` |
+| 11C.2 | Paralelne transakcije, zaključavanje i rollback | ✅ Provjereni planirani scenariji na `db_test` |
 | Kasnije | DON!!/varijante, Vue frontend, objava | Planirano |
 
 ## Tehnologije
@@ -41,33 +42,44 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 
 ## Lokalno pokretanje (Windows PowerShell)
 
-Preduvjeti: Docker Desktop, Python, `uv` i pripremljen `.env` (prema `.env.example`). **Ne prepisivati postojeći `.env`.**
+Preduvjeti su Docker Desktop, Python 3.11+ i `uv`. Naredbe za prvo
+postavljanje pokreni iz korijena kloniranog repozitorija.
 
-**Terminal 1 — Docker i API:**
+**Prvo postavljanje**
 
 ```powershell
-cd C:\Users\admin\OPTCG_Collection
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 docker compose up -d db
-docker compose ps
+docker compose exec db pg_isready
 cd api
+uv venv
 .\.venv\Scripts\Activate.ps1
+uv pip install -r requirements-dev.txt
+python -m alembic upgrade head
+python -m app.seed
+python -m pytest -m "not postgres" -q tests
 python -m uvicorn app.main:app --reload
 ```
+
+`pg_isready` treba javiti da PostgreSQL prihvaća veze prije pokretanja
+migracija. Seed popunjava početne setove i rječnike. Za popunjen katalog slijedi
+upute za [CSV uvoz](#podaci-kataloga-i-kolekcije).
 
 - Swagger: <http://127.0.0.1:8000/docs>
 - Health: <http://127.0.0.1:8000/health>
 - PostgreSQL: `127.0.0.1:5433` (kontejner koristi `5432`)
 
-**Terminal 2 — testovi i migracije:**
+**Ponovno pokretanje** iz korijena repozitorija
 
 ```powershell
-cd C:\Users\admin\OPTCG_Collection\api
+docker compose up -d db
+cd api
 .\.venv\Scripts\Activate.ps1
-python -m pytest tests -q
-alembic current
+python -m uvicorn app.main:app --reload
 ```
 
-Za novo postavljanje okruženja (ne za svaki restart): u mapi `api/` napraviti `uv venv` te instalirati `uv pip install -r requirements.txt` i `uv pip install -r requirements-dev.txt`. `alembic upgrade head` izvršava se kada postoji nova migracija; seed se pokreće prema potrebi (`python -m app.seed`).
+Kad preuzmeš novu migraciju, iz `api/` pokreni `python -m alembic upgrade head`.
+Za puni testni prolaz koristi [zasebni PostgreSQL servis](docs/KORAK_11C1_POSTGRES_TEST_BAZA.md).
 
 Zaustavljanje: `Ctrl+C` za Uvicorn; iz korijena projekta `docker compose stop` za bazu. **Ne koristiti `docker compose down -v`** za uobičajeno zaustavljanje jer briše podatkovne volumene.
 
@@ -327,3 +339,15 @@ Ruff cleanup završen je prije Koraka 11A.2. Stroga validacija 11A.2 i ugovor HT
 - Dodano je osam ciljnih OpenAPI testova; puni suite ima 456 prolaznih testova. Detalji: `docs/KORAK_11B3_OPENAPI_REVIZIJA.md`.
 
 Sljedeći obavezni korak je **11C**: zasebna trajna PostgreSQL testna baza bez osobnih podataka, automatsko postavljanje sheme te stvarni testovi paralelnih transakcija, zaključavanja i rollbacka prije PR-a u `main`.
+
+### Korak 11C.1 — izolirana PostgreSQL testna baza
+
+- Compose profil `test` dodaje servis `db_test` na `127.0.0.1:5434`, bazu `optcg_test`, korisnika `optcg_test_user` i zaseban volume `pgdata_test`; postojeći `db` na portu 5433 nije promijenjen.
+- PostgreSQL testovi čitaju isključivo eksplicitni `TEST_DATABASE_URL`, bez fallbacka na razvojni `DATABASE_URL`.
+- Prije migracije ili upisa provjeravaju se driver, host, port, korisnik i naziv iz URL-a; svi URL query parametri su zabranjeni. Na stvarnoj konekciji dodatno se provjeravaju naziv baze, korisnik, interni port, PostgreSQL verzija i `cluster_name=optcg_test_11c`.
+- Alembic u testnom načinu otvara eksplicitnu vanjsku transakciju te na istoj konekciji provjerava identitet i izvršava migracije. Uspjeh commitira cijeli blok, a pogreška ili nevaljan identitet uzrokuju rollback prije djelomične primjene; testne offline migracije nisu dopuštene.
+- `python -m app.prepare_test_database` primjenjuje postojeće Alembic migracije do `004 (head)` tek nakon sigurnosnih provjera.
+- Obični SQLite/mock testovi ne zahtijevaju Docker. PostgreSQL testovi imaju marker `postgres`; obični suite ih bez testne varijable preskače, dok eksplicitni režim `POSTGRES_TEST_REQUIRED=1` nedostajuću konfiguraciju ili nedostupnu bazu tretira kao failure.
+- Na lokalnom `db_test` potvrđen je ciklus migracija `004 → 003 → 004`. Nakon ponovnog upgradea prošla su sva tri početna PostgreSQL testa.
+- Nakon 11C.2 puni skup ima `502 passed`, uključujući 12 PostgreSQL testova.
+- Potpune naredbe i sigurnosni ugovor opisani su u `docs/KORAK_11C1_POSTGRES_TEST_BAZA.md`.

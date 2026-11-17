@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, get_db
+from app.core.deps import db_session_dependency, get_current_user
 from app.models.user import User
 from app.schemas.card_loan import CardLoanCreate, CardLoanResponse, CardLoanReturn
 from app.schemas.error import error_responses
@@ -23,11 +23,19 @@ async def list_loans(
     user_id: int = Path(ge=1),
     direction: Literal["lent", "borrowed"] | None = Query(default=None),
     active_only: bool = Query(default=False),
-    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=2_147_483_647),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     return await card_loan_service.list_loans(
-        db, current_user, user_id, direction=direction, active_only=active_only
+        db,
+        current_user,
+        user_id,
+        direction=direction,
+        active_only=active_only,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -40,7 +48,7 @@ async def list_loans(
 async def create_loan(
     body: CardLoanCreate,
     user_id: int = Path(ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     return await card_loan_service.create_loan(db, current_user, user_id, body)
@@ -54,7 +62,7 @@ async def create_loan(
 async def get_loan(
     user_id: int = Path(ge=1),
     loan_id: int = Path(ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     return await card_loan_service.get_loan(db, current_user, user_id, loan_id)
@@ -69,7 +77,7 @@ async def return_loan(
     body: CardLoanReturn,
     user_id: int = Path(ge=1),
     loan_id: int = Path(ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
     current_user: User = Depends(get_current_user),
 ):
     return await card_loan_service.return_loan(db, current_user, user_id, loan_id, body)

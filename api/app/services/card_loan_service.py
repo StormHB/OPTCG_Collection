@@ -46,10 +46,17 @@ async def list_loans(
     *,
     direction: str | None = None,
     active_only: bool = False,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[CardLoanResponse]:
     ensure_collection_owner(current_user, user_id)
     loans = await card_loan_repo.list_for_owner(
-        db, user_id, direction=direction, active_only=active_only
+        db,
+        user_id,
+        direction=direction,
+        active_only=active_only,
+        limit=limit,
+        offset=offset,
     )
     return [_serialize(loan) for loan in loans]
 

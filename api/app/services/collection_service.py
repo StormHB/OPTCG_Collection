@@ -17,10 +17,17 @@ def ensure_collection_owner(current_user: User, owner_user_id: int) -> None:
 
 
 async def get_user_collection(
-    db: AsyncSession, current_user: User, owner_user_id: int
+    db: AsyncSession,
+    current_user: User,
+    owner_user_id: int,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[CollectionEntry]:
     ensure_collection_owner(current_user, owner_user_id)
-    return await collection_repo.list_for_user(db, owner_user_id)
+    return await collection_repo.list_for_user(
+        db, owner_user_id, limit=limit, offset=offset
+    )
 
 
 async def add_collection_entry(

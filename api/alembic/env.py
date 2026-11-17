@@ -9,10 +9,21 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.core.config import settings
+from app.core.test_database import (
+    UnsafeTestDatabaseError,
+    run_test_migration_transaction,
+    validate_test_database_url,
+)
 from app.models import Base  # registrira modele i izlaže njihove tablice
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
+test_database_url = config.attributes.get("test_database_url")
+database_url = (
+    validate_test_database_url(test_database_url)
+    if test_database_url is not None
+    else settings.DATABASE_URL
+)
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
@@ -20,8 +31,12 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
+    if test_database_url is not None:
+        raise UnsafeTestDatabaseError(
+            "Testne migracije zahtijevaju online provjeru iste konekcije"
+        )
     context.configure(
-        url=settings.DATABASE_URL,
+        url=database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -30,7 +45,7 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection: Connection) -> None:
+def _configure_and_run_migrations(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -38,6 +53,13 @@ def do_run_migrations(connection: Connection) -> None:
     )
     with context.begin_transaction():
         context.run_migrations()
+
+
+def do_run_migrations(connection: Connection) -> None:
+    if test_database_url is not None:
+        run_test_migration_transaction(connection, _configure_and_run_migrations)
+    else:
+        _configure_and_run_migrations(connection)
 
 
 async def run_async_migrations() -> None:

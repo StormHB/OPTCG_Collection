@@ -9,12 +9,16 @@ from app.models.collection_entry import CollectionEntry
 from app.repositories import card_loan_repo
 
 
-async def list_for_user(db: AsyncSession, user_id: int) -> list[CollectionEntry]:
+async def list_for_user(
+    db: AsyncSession, user_id: int, *, limit: int | None = None, offset: int = 0
+) -> list[CollectionEntry]:
     """Postojeći GET kolekcije iz predavanja 4."""
     result = await db.scalars(
         select(CollectionEntry)
         .where(CollectionEntry.user_id == user_id)
         .order_by(CollectionEntry.id)
+        .limit(limit)
+        .offset(offset)
     )
     return list(result.all())
 
@@ -57,19 +61,18 @@ async def update_entry(
     db: AsyncSession, entry: CollectionEntry, changes: dict
 ) -> CollectionEntry:
     """Mijenjaj samo polja koja su bila poslana u PATCH zahtjevu."""
+    # I PATCH napomene mora provjeriti postoji li redak nakon cekanja na DELETE.
+    locked = await db.scalar(
+        select(CollectionEntry)
+        .where(CollectionEntry.id == entry.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if locked is None:
+        raise AppError("not_found", "Zapis kolekcije nije pronaden", 404)
     if "quantity" in changes:
-        # Zakljucaj redak cak i ako kolicina raste: stanje iz prvog citanja
-        # moze biti zastarjelo nakon paralelnog zahtjeva.
-        locked = await db.scalar(
-            select(CollectionEntry)
-            .where(CollectionEntry.id == entry.id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-        if locked is None:
-            raise AppError("not_found", "Zapis kolekcije nije pronaden", 404)
         lent = await card_loan_repo.outstanding_lent(
-            db, entry.user_id, entry.printing_id
+            db, locked.user_id, locked.printing_id
         )
         if changes["quantity"] < lent:
             raise AppError(
@@ -79,9 +82,9 @@ async def update_entry(
                 409,
             )
     for field, value in changes.items():
-        setattr(entry, field, value)
+        setattr(locked, field, value)
     await db.flush()
-    return entry
+    return locked
 
 
 async def delete_entry(db: AsyncSession, entry: CollectionEntry) -> None:
