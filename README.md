@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje 17. 11. 2026. — revizija backenda.** Funkcionalnosti do koraka 10B spojene su u `main`. Na grani `fix/backend-validation` su revizije 11A i 11B, straničenje kolekcije i posudbi te potvrđena izolirana PostgreSQL baza. U 11C.2 dodane su prve regresije paralelnih transakcija.
+> **Stanje 17. 11. 2026. — predaja backenda.** Revizija backenda spojena je u `main` kroz PR #8. Obuhvaća API validaciju, straničenje kolekcije i posudbi te PostgreSQL provjere migracija, zaključavanja i rollbacka. Prošla su sva 502 testa, uključujući 12 PostgreSQL testova.
 
 ## Napredak
 
@@ -338,7 +338,7 @@ Ruff cleanup završen je prije Koraka 11A.2. Stroga validacija 11A.2 i ugovor HT
 - Excel preview/apply dobili su eksplicitne response modele, a dokumentirani su i `plan_token`, načini `replace`/`add`, osobni filtri, Counter opcije te vremenske zone posudbi.
 - Dodano je osam ciljnih OpenAPI testova; puni suite ima 456 prolaznih testova. Detalji: `docs/KORAK_11B3_OPENAPI_REVIZIJA.md`.
 
-Sljedeći obavezni korak je **11C**: zasebna trajna PostgreSQL testna baza bez osobnih podataka, automatsko postavljanje sheme te stvarni testovi paralelnih transakcija, zaključavanja i rollbacka prije PR-a u `main`.
+U koraku **11C** uvedeni su zasebna PostgreSQL testna baza, automatsko postavljanje sheme i testovi paralelnih transakcija.
 
 ### Korak 11C.1 — izolirana PostgreSQL testna baza
 
