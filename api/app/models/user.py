@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Boolean, CheckConstraint, String, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.collection_entry import CollectionEntry
 
 
 class User(Base):
@@ -20,10 +25,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False, server_default="user")
 
     is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=True,
-        server_default=true()
+        Boolean, nullable=False, default=True, server_default=true()
     )
 
     collection_entries: Mapped[list[CollectionEntry]] = relationship(

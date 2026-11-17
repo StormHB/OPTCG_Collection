@@ -7,7 +7,7 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, get_db
+from app.core.deps import db_session_dependency, get_current_user
 from app.models.user import User
 
 _optional_bearer = HTTPBearer(auto_error=False)
@@ -16,7 +16,7 @@ _optional_bearer = HTTPBearer(auto_error=False)
 async def get_collection_filter_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_session_dependency,
 ) -> User | None:
     """Bez osobnih filtera nema potrebe dohvaćati ni validirati korisnika.
 

@@ -15,6 +15,7 @@ def require_role(*allowed_roles: str) -> Callable[..., User]:
     Ulogu čitamo iz baze preko get_current_user; ne vjerujemo staroj
     vrijednosti u JWT tokenu. Koristi se u rutama kroz Depends.
     """
+
     def checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
             raise AppError("forbidden", "Nemate dozvolu za ovu radnju", 403)

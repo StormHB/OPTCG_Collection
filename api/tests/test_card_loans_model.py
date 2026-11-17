@@ -21,8 +21,19 @@ def engine():
 
 def test_model_registered_and_has_expected_columns(engine):
     columns = {column["name"] for column in inspect(engine).get_columns("card_loans")}
-    assert {"id", "user_id", "printing_id", "direction", "person_name", "quantity",
-            "quantity_returned", "loaned_at", "due_at", "returned_at", "note"} == columns
+    assert {
+        "id",
+        "user_id",
+        "printing_id",
+        "direction",
+        "person_name",
+        "quantity",
+        "quantity_returned",
+        "loaned_at",
+        "due_at",
+        "returned_at",
+        "note",
+    } == columns
 
 
 def test_all_datetimes_are_timezone_aware_in_schema():
@@ -34,25 +45,38 @@ def test_all_datetimes_are_timezone_aware_in_schema():
 
 
 def test_outstanding_quantity():
-    loan = CardLoan(user_id=1, printing_id=1, direction="lent", person_name="Ivan",
-                    quantity=4, quantity_returned=2)
+    loan = CardLoan(
+        user_id=1,
+        printing_id=1,
+        direction="lent",
+        person_name="Ivan",
+        quantity=4,
+        quantity_returned=2,
+    )
     assert loan.outstanding_quantity == 2
     loan.quantity_returned = 4
     assert loan.outstanding_quantity == 0
 
 
-@pytest.mark.parametrize("changes", [
-    {"quantity": 0},
-    {"quantity": -2},
-    {"quantity_returned": -1},
-    {"quantity_returned": 4},
-    {"direction": "other"},
-    {"person_name": "   "},
-])
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"quantity": 0},
+        {"quantity": -2},
+        {"quantity_returned": -1},
+        {"quantity_returned": 4},
+        {"direction": "other"},
+        {"person_name": "   "},
+    ],
+)
 def test_invalid_values_rejected_by_database(engine, changes):
     values = {
-        "user_id": 1, "printing_id": 1, "direction": "lent", "person_name": "Ivan",
-        "quantity": 3, "quantity_returned": 0,
+        "user_id": 1,
+        "printing_id": 1,
+        "direction": "lent",
+        "person_name": "Ivan",
+        "quantity": 3,
+        "quantity_returned": 0,
     }
     values.update(changes)
     with pytest.raises(IntegrityError):
@@ -62,10 +86,16 @@ def test_invalid_values_rejected_by_database(engine, changes):
 
 def test_valid_loan_can_be_inserted(engine):
     with engine.begin() as connection:
-        connection.execute(insert(CardLoan).values(
-            user_id=1, printing_id=1, direction="borrowed",
-            person_name="Marko", quantity=3, quantity_returned=1,
-        ))
+        connection.execute(
+            insert(CardLoan).values(
+                user_id=1,
+                printing_id=1,
+                direction="borrowed",
+                person_name="Marko",
+                quantity=3,
+                quantity_returned=1,
+            )
+        )
 
 
 def test_foreign_keys_reference_expected_tables():

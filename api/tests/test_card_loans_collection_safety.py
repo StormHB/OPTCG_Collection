@@ -51,8 +51,12 @@ def sample():
         session.flush()
         entry = CollectionEntry(user_id=owner.id, printing_id=printing.id, quantity=5)
         loan = CardLoan(
-            user_id=owner.id, printing_id=printing.id, direction="lent",
-            person_name="Ivan", quantity=4, quantity_returned=1,
+            user_id=owner.id,
+            printing_id=printing.id,
+            direction="lent",
+            person_name="Ivan",
+            quantity=4,
+            quantity_returned=1,
         )
         session.add_all([entry, loan])
         session.commit()

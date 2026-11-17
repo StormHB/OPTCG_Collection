@@ -40,12 +40,23 @@ def _serialize(loan: CardLoan) -> CardLoanResponse:
 
 
 async def list_loans(
-    db: AsyncSession, current_user: User, user_id: int,
-    *, direction: str | None = None, active_only: bool = False,
+    db: AsyncSession,
+    current_user: User,
+    user_id: int,
+    *,
+    direction: str | None = None,
+    active_only: bool = False,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[CardLoanResponse]:
     ensure_collection_owner(current_user, user_id)
     loans = await card_loan_repo.list_for_owner(
-        db, user_id, direction=direction, active_only=active_only
+        db,
+        user_id,
+        direction=direction,
+        active_only=active_only,
+        limit=limit,
+        offset=offset,
     )
     return [_serialize(loan) for loan in loans]
 
@@ -67,19 +78,26 @@ async def create_loan(
     loaned_at = _utc(data.loaned_at) if data.loaned_at else datetime.now(timezone.utc)
     due_at = _utc(data.due_at) if data.due_at else None
     if due_at is not None and due_at < loaned_at:
-        raise AppError("invalid_loan_dates", "Rok vracanja ne moze biti prije datuma posudbe", 422)
+        raise AppError(
+            "invalid_loan_dates", "Rok vracanja ne moze biti prije datuma posudbe", 422
+        )
     if not await card_loan_repo.printing_exists(db, data.printing_id):
         raise AppError("printing_not_found", "Izdanje karte nije pronadeno", 404)
 
     if data.direction == "lent":
         # Najprije zaključaj owned redak; tek nakon toga zbroji aktivne posudbe.
-        owned = await card_loan_repo.owned_quantity_locked(db, user_id, data.printing_id)
-        outstanding = await card_loan_repo.outstanding_lent(db, user_id, data.printing_id)
+        owned = await card_loan_repo.owned_quantity_locked(
+            db, user_id, data.printing_id
+        )
+        outstanding = await card_loan_repo.outstanding_lent(
+            db, user_id, data.printing_id
+        )
         available = max(0, owned - outstanding)
         if data.quantity > available:
             raise AppError(
                 "insufficient_quantity",
-                f"Nije moguce posuditi {data.quantity} primjeraka; dostupno je {available}",
+                f"Nije moguce posuditi {data.quantity} primjeraka; "
+                f"dostupno je {available}",
                 409,
             )
 
@@ -101,8 +119,11 @@ async def create_loan(
 
 
 async def return_loan(
-    db: AsyncSession, current_user: User, user_id: int,
-    loan_id: int, data: CardLoanReturn,
+    db: AsyncSession,
+    current_user: User,
+    user_id: int,
+    loan_id: int,
+    data: CardLoanReturn,
 ) -> CardLoanResponse:
     ensure_collection_owner(current_user, user_id)
     loan = await card_loan_repo.get_for_owner(db, user_id, loan_id, lock=True)
@@ -115,12 +136,17 @@ async def return_loan(
     if data.quantity > outstanding:
         raise AppError(
             "return_exceeds_outstanding",
-            f"Nije moguce vratiti {data.quantity} primjeraka; preostalo je {outstanding}",
+            f"Nije moguce vratiti {data.quantity} primjeraka; "
+            f"preostalo je {outstanding}",
             409,
         )
-    returned_at = _utc(data.returned_at) if data.returned_at else datetime.now(timezone.utc)
+    returned_at = (
+        _utc(data.returned_at) if data.returned_at else datetime.now(timezone.utc)
+    )
     if returned_at < _utc(loan.loaned_at):
-        raise AppError("invalid_return_date", "Datum vracanja ne moze biti prije posudbe", 422)
+        raise AppError(
+            "invalid_return_date", "Datum vracanja ne moze biti prije posudbe", 422
+        )
 
     loan.quantity_returned += data.quantity
     if loan.quantity_returned == loan.quantity:

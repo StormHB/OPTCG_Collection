@@ -17,10 +17,17 @@ def ensure_collection_owner(current_user: User, owner_user_id: int) -> None:
 
 
 async def get_user_collection(
-    db: AsyncSession, current_user: User, owner_user_id: int
+    db: AsyncSession,
+    current_user: User,
+    owner_user_id: int,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[CollectionEntry]:
     ensure_collection_owner(current_user, owner_user_id)
-    return await collection_repo.list_for_user(db, owner_user_id)
+    return await collection_repo.list_for_user(
+        db, owner_user_id, limit=limit, offset=offset
+    )
 
 
 async def add_collection_entry(
@@ -48,7 +55,9 @@ async def add_collection_entry(
     except IntegrityError:
         # Dodatna zaštita od dva paralelna zahtjeva za isto izdanje.
         # get_db() će nakon iznimke napraviti rollback transakcije.
-        raise AppError("conflict", "Nije moguce dodati izdanje u kolekciju", 409) from None
+        raise AppError(
+            "conflict", "Nije moguce dodati izdanje u kolekciju", 409
+        ) from None
 
 
 async def update_collection_entry(

@@ -1,5 +1,5 @@
 # Predavanje 1 - FastAPI i razvojni server
-fastapi>=0.115
+fastapi>=0.121.0
 uvicorn[standard]>=0.34
 pydantic-settings>=2.7
 ruff>=0.9

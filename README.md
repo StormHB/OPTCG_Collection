@@ -2,7 +2,7 @@
 
 Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pregled i filtriranje zajedničkog kataloga One Piece TCG karata te vođenje **osobne kolekcije za svakog korisnika**. Backend se razvija postupno uz FastAPI, PostgreSQL i automatizirane testove; Vue frontend slijedi kasnije.
 
-> **Stanje: 13. 11. 2026. — Korak 10B u provjeri.** Autentikacija, katalog, Excel import i posudbe završeni su; Korak 10A potvrđen je na stvarnoj kolekciji (2.133 primjerka, 662 izdanja, 285 playsetova). Korak 10B dodaje osobne filtere na javni katalog. Nakon lokalnih testova, Swagger provjere, commita i pusha slijedi PR za `feat/collection-stats`.
+> **Stanje 17. 11. 2026. — revizija backenda.** Funkcionalnosti do koraka 10B spojene su u `main`. Na grani `fix/backend-validation` su revizije 11A i 11B, straničenje kolekcije i posudbi te potvrđena izolirana PostgreSQL baza. U 11C.2 dodane su prve regresije paralelnih transakcija.
 
 ## Napredak
 
@@ -15,10 +15,21 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 | 08A | CRUD osobne kolekcije | ✅ |
 | 08B | Excel import (`preview` / `apply`) | ✅ |
 | 09A | Model posudbi i migracija `004` | ✅ |
-| 09B | API posudbi, dostupnost i djelomična vraćanja | ✅ 180 testova i ručne provjere |
-| 10A | Statistika kolekcije i playsetova (read-only API) | ✅ SQL i Swagger provjereni |
-| 10B | Filteri `owned`, `missing`, `playset` | Implementirano; testovi i Swagger na lokalnom projektu prije commita |
-| Dalje | DON!!/varijante, Vue frontend, završno testiranje i objava | Planirano |
+| 09B | API posudbi, dostupnost i djelomična vraćanja | ✅ |
+| 10A | Statistika kolekcije i playsetova (read-only API) | ✅ |
+| 10B | Filteri `owned`, `missing`, `playset` i aliasi setova | ✅ Spojeno u `main` |
+| 11A.1 | Numerički filteri, Counter dropdown i Ruff cleanup | ✅ Lokalno provjereno; commitano |
+| 11A.2 | Stroga validacija JSON zahtjeva | ✅ Lokalno provjereno |
+| 11A.3 | Provjera HTTP kodova i poruka | ✅ Lokalno provjereno |
+| 11B.1 | Regresijska provjera filtera kataloga | ✅ Lokalno provjereno: 71 ciljani / 393 ukupno |
+| 11B.2A | Autentikacija, autorizacija i vlasništvo | ✅ Lokalno provjereno: 32 nova / 425 ukupno |
+| 11B.2B | CRUD osobne kolekcije i konkurentnost | ✅ Lokalno provjereno: 7 novih / 432 ukupno |
+| 11B.2C | Excel import | ✅ Lokalno provjereno: 9 novih / 441 ukupno |
+| 11B.2D | Posudbe | ✅ Lokalno provjereno: 7 novih / 448 ukupno |
+| 11B.3 | API rute, Swagger/OpenAPI i HTTP ugovor | ✅ Lokalno provjereno: 8 novih / 456 ukupno |
+| 11C.1 | Trajna izolirana PostgreSQL testna baza | ✅ Potvrđene 3 provjere i ciklus `004 → 003 → 004` |
+| 11C.2 | Paralelne transakcije, zaključavanje i rollback | ✅ Provjereni planirani scenariji na `db_test` |
+| Kasnije | DON!!/varijante, Vue frontend, objava | Planirano |
 
 ## Tehnologije
 
@@ -31,33 +42,44 @@ Studentski projekt za kolegij **Programiranje za web**. Aplikacija omogućuje pr
 
 ## Lokalno pokretanje (Windows PowerShell)
 
-Preduvjeti: Docker Desktop, Python, `uv` i pripremljen `.env` (prema `.env.example`). **Ne prepisivati postojeći `.env`.**
+Preduvjeti su Docker Desktop, Python 3.11+ i `uv`. Naredbe za prvo
+postavljanje pokreni iz korijena kloniranog repozitorija.
 
-**Terminal 1 — Docker i API:**
+**Prvo postavljanje**
 
 ```powershell
-cd C:\Users\admin\OPTCG_Collection
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 docker compose up -d db
-docker compose ps
+docker compose exec db pg_isready
 cd api
+uv venv
 .\.venv\Scripts\Activate.ps1
+uv pip install -r requirements-dev.txt
+python -m alembic upgrade head
+python -m app.seed
+python -m pytest -m "not postgres" -q tests
 python -m uvicorn app.main:app --reload
 ```
+
+`pg_isready` treba javiti da PostgreSQL prihvaća veze prije pokretanja
+migracija. Seed popunjava početne setove i rječnike. Za popunjen katalog slijedi
+upute za [CSV uvoz](#podaci-kataloga-i-kolekcije).
 
 - Swagger: <http://127.0.0.1:8000/docs>
 - Health: <http://127.0.0.1:8000/health>
 - PostgreSQL: `127.0.0.1:5433` (kontejner koristi `5432`)
 
-**Terminal 2 — testovi i migracije:**
+**Ponovno pokretanje** iz korijena repozitorija
 
 ```powershell
-cd C:\Users\admin\OPTCG_Collection\api
+docker compose up -d db
+cd api
 .\.venv\Scripts\Activate.ps1
-python -m pytest tests -q
-alembic current
+python -m uvicorn app.main:app --reload
 ```
 
-Za novo postavljanje okruženja (ne za svaki restart): u mapi `api/` napraviti `uv venv` te instalirati `uv pip install -r requirements.txt` i `uv pip install -r requirements-dev.txt`. `alembic upgrade head` izvršava se kada postoji nova migracija; seed se pokreće prema potrebi (`python -m app.seed`).
+Kad preuzmeš novu migraciju, iz `api/` pokreni `python -m alembic upgrade head`.
+Za puni testni prolaz koristi [zasebni PostgreSQL servis](docs/KORAK_11C1_POSTGRES_TEST_BAZA.md).
 
 Zaustavljanje: `Ctrl+C` za Uvicorn; iz korijena projekta `docker compose stop` za bazu. **Ne koristiti `docker compose down -v`** za uobičajeno zaustavljanje jer briše podatkovne volumene.
 
@@ -113,7 +135,9 @@ Za popis ruta i primjere zahtjeva koristi Swagger. Trenutačno su implementirane
 GET /cards?colors=red&colors=yellow&sets=op01&limit=20&offset=0
 ```
 
-Dostupni su filteri za boju, tip, cijenu, snagu, atribut, counter, blok, keyword, archetype, set, rijetkost i varijantu. Izdanje/set/rarity/variant/block moraju se podudarati na istom printingu. `counter_values=none` označava odsutnu tiskanu Counter vrijednost, ne broj `0` ili keyword `[Counter]`.
+Dostupni su filteri za boju, tip, cijenu (`costs` 0–10), snagu (`powers` 0–13000), atribut, Counter, blok, keyword, archetype, set, rijetkost i varijantu. Filteri za set, rarity, variant i block primjenjuju se na **isto fizičko izdanje**. **Counter dropdown** (`counter_values`) prihvaća samo `0`, `1000` i `2000`; za karte bez tiskane Counter vrijednosti (`NULL`) koristi se zaseban `counter_missing=true`. `counter_values=none` više nije podržan i vraća `422`. Counter `0` nije isto što i `NULL` niti keyword `[Counter]`.
+
+Za više vrijednosti ponovi isti query parametar (npr. `colors=red&colors=yellow`). `GET /cards` vraća osnovne karte, dok osobna statistika broji fizička izdanja.
 
 **Alias za oznake setova (10B):** filter `sets` i tekstualna pretraga `search` prihvaćaju `OP01` i `OP-01` (uključujući `op01`, `op-01` i rubne razmake). Isto vrijedi za `EB`, `ST` i `PRB` (`EB-03` = `EB03`). Baza ostaje u kanonskom formatu bez dodatne crtice, a puni kod karte poput `OP01-016` ostaje nepromijenjen.
 
@@ -191,8 +215,8 @@ Provjera količina u PostgreSQL-u:
 
 ```sql
 SELECT user_id,
-       COUNT(*) AS razlicitih_izdanja,
-       COALESCE(SUM(quantity), 0) AS ukupno_primjeraka
+       COUNT(*) FILTER (WHERE quantity > 0) AS razlicitih_izdanja,
+       COALESCE(SUM(quantity) FILTER (WHERE quantity > 0), 0) AS ukupno_primjeraka
 FROM collection_entries
 GROUP BY user_id
 ORDER BY user_id;
@@ -203,7 +227,6 @@ Uvoznici kataloga (iz mape `api/`; pregled bez upisa pa potvrda):
 ```powershell
 python -m app.import_catalog --file ..\data\catalog_from_excel.csv
 python -m app.import_catalog --file ..\data\catalog_from_excel.csv --apply
-
 python -m app.enrich_catalog --download
 python -m app.enrich_catalog
 python -m app.enrich_catalog --apply
@@ -223,7 +246,7 @@ Prije većeg upisa preporučuje se sigurnosna kopija baze. Privatne Excel datote
 
 **Korak 9B — API posudbi:** omogućeni su pregled, unos i djelomični/potpuni povrat. Ne može se posuditi više vlastitih primjeraka nego što je raspoloživo; aktivne posudbe štite od smanjivanja količine kroz PATCH, brisanje ili Excel `replace`. Posudba **ne mijenja vlasničku količinu** u `collection_entries`; tuđe posuđene karte **ne povećavaju vlastite playsetove**. Odgovori uključuju točan `printing_id`, kod, set i URL ilustracije za budući Vue prikaz. Dokumentacija: `docs/KORAK_09B_API_POSUDBI.md`.
 
-**Dalje:** lokalna provjera 10B, commit/push i PR `feat/collection-stats` → `main`; zatim DON!!/alternativna izdanja i Vue sučelje.
+**Dalje:** zasebna prazna PostgreSQL testna baza obavezan je završni dio backend revizije za stvarne paralelne transakcije, zaključavanje i rollback. Postojeća baza s osobnom kolekcijom ne smije se koristiti. Tek nakon backend cjeline planirati Vue frontend; dopune DON!! i alternativnih izdanja ostaju zasebni zadaci.
 
 Za nove datumsko-vremenske API podatke koristimo Pydantic `AwareDatetime`, normalizaciju na UTC (`datetime.now(timezone.utc)` i `.astimezone(timezone.utc)`), a lokalnu zonu samo za prikaz.
 
@@ -239,8 +262,92 @@ python -m ruff format --check .
 alembic current
 ```
 
-Na kraju svakog testiranog koraka ažuriramo dokumentaciju te radimo **commit i push**. Pull Request u `main` radimo po završetku funkcionalne cjeline. Koraci 10A i 10B razvijaju se na branchu `feat/collection-stats`, nastalom nakon mergea `feat/card-loans` u `main`.
+Na kraju svakog testiranog koraka ažuriramo dokumentaciju te radimo **commit i push**. Pull Request u `main` radimo po završetku funkcionalne cjeline. Koraci 10A i 10B završeni su i spojeni u `main`; backend reviziju 11A/11B radimo na branchu `fix/backend-validation`.
 
 Prije commita provjeriti `git status`, `git diff --cached --stat` i `git diff --cached --check`; nikad ne commitati `.env`, tajne, osobne `.xlsx`, `backups/`, preuzete snapshotove ni `.venv/`.
 
-Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI.md`. Korak 10A: `docs/KORAK_10A_STATISTIKA_KOLEKCIJE.md`. Korak 10B: `docs/KORAK_10B_FILTERI_KOLEKCIJE.md`.
+Detalji posudbi: `docs/KORAK_09A_MODEL_POSUDBI.md` i `docs/KORAK_09B_API_POSUDBI.md`. Korak 10A: `docs/KORAK_10A_STATISTIKA_KOLEKCIJE.md`. Korak 10B: `docs/KORAK_10B_FILTERI_KOLEKCIJE.md`. Korak 11A.1: `docs/KORAK_11A1_NUMERICKI_FILTERI.md` i `docs/KORAK_11A_RUFF_CLEANUP.md`.
+
+### Backend revizija — Ruff cleanup
+
+- Provedeno formatiranje i sređivanje Python koda.
+- Ispravljeni neiskorišteni importi i varijable.
+- Ispravljene tipne reference SQLAlchemy modela pomoću TYPE_CHECKING.
+- Ispravljen redoslijed importa i predugački retci.
+- Ruff check: 0 grešaka.
+- Ruff format: sve datoteke pravilno formatirane.
+- Pytest: 243 uspješna testa.
+
+Ruff cleanup završen je prije Koraka 11A.2. Stroga validacija 11A.2 i ugovor HTTP kodova/poruka 11A.3 naknadno su lokalno potvrđeni punim regresijskim skupom.
+
+### Korak 11A.2 — stroga validacija JSON zahtjeva
+
+- Svi request-body modeli za autentikaciju, kolekcije i posudbe odbijaju nepoznata JSON polja (`extra="forbid"`).
+- ID-jevi i količine u zahtjevima za kolekciju/posudbe moraju biti stvarni cijeli brojevi; stringovi, decimalni brojevi i `true`/`false` nisu dopušteni kao zamjena.
+- Prazne napomene nisu dopuštene: `note=null` služi za brisanje; izostavljeno polje kod `PATCH` ostaje nepromijenjeno.
+- JSON datumi posudbi moraju biti ISO 8601 stringovi s vremenskom zonom. Ime osobe ne smije biti prazno.
+- Neispravni zahtjevi vraćaju `422` i `code="validation_error"`, bez poziva servisa.
+- Regresijski testovi: `api/tests/test_request_body_validation.py`. Detalji: `docs/KORAK_11A2_STROGA_JSON_VALIDACIJA.md`.
+- Nema nove migracije; Alembic ostaje na `004 (head)`.
+
+**Stanje provjere 11A.2 i 11A.3:** uključeni su u aktualni puni lokalni regresijski skup; stroga validacija, sigurni HTTP odgovori i Ruff provjere prolaze. Alembic ostaje `004 (head)`.
+
+### Korak 11B.1 — regresija filtera kataloga
+
+- `counter_values` prihvaća samo `0`, `1000` i `2000`; OpenAPI prikazuje isti enum.
+- Nedostajući tiskani Counter bira se s `counter_missing=true`; stari `counter_values=none` i vrijednosti izvan dropdowna vraćaju `422` prije repozitorija.
+- Potvrđeno lokalno: ciljna matrica 71/71, puni suite 393/393, Ruff check i format check bez grešaka.
+- Detalji: `docs/KORAK_11B1_REGRESIJA_FILTERA.md`.
+
+### Korak 11B.2A — autentikacija, autorizacija i vlasništvo
+
+- Proširena je regresijska matrica registracije, prijave, access/refresh tokena, isteka i izmjene JWT-a te nepostojećih i deaktiviranih korisnika.
+- Potvrđeno je da se administratorska uloga čita iz aktualnog zapisa baze, a administrator nema automatski pristup tuđoj osobnoj kolekciji.
+- Promjena `user_id` u URL-u ili queryju ne može zaobići vlasništvo; osobni filteri koriste samo identitet iz JWT-a.
+- Nova matrica ima 32 izolirana testa; puni suite ima 425 prolaznih testova, a Ruff provjere prolaze. Detalji su u `docs/KORAK_11B2A_AUTORIZACIJA.md`.
+
+### Korak 11B.2B — CRUD osobne kolekcije
+
+- Ponovno su provjereni POST, GET, PATCH i DELETE ugovori, granice količine, parcijalne izmjene, vlasništvo i zaštita aktivnih posudbi.
+- Dodatno su potvrđeni DB unique constraint i sigurni `409` fallback za istodobno stvaranje duplikata te PostgreSQL `FOR UPDATE` u PATCH/DELETE putu.
+- Ispravljen je race pri DELETE-u: ako zapis nestane prije zaključavanja, API vraća kontrolirani `404` bez loan upita ili ponovnog brisanja.
+- SQLite/mock testovi ne dokazuju stvarno raspoređivanje paralelnih PostgreSQL transakcija; potrebni scenariji i postojeća “zadnji commit pobjeđuje” PATCH semantika dokumentirani su zasebno.
+- Dodano je sedam izoliranih regresijskih testova; ciljna cjelina ima 99, puni suite 432 prolazna testa, a Ruff provjere prolaze. Detalji: `docs/KORAK_11B2B_CRUD_KOLEKCIJE.md`.
+
+### Korak 11B.2C — Excel import
+
+- Ponovno su provjereni vlasništvo, `.xlsx` validacija, preview/apply ugovor, `replace`/`add`, napomene, stale stanje i zaštita aktivnih posudbi.
+- `plan_token` je vezan uz datoteku, način, korisnika i relevantno stanje; nije JWT i nema vremenski rok u aktualnom API ugovoru.
+- Dodatno su provjereni oštećeni upload bez curenja detalja, izmijenjeni token, promjena kolekcije između previewa i applyja, ponovljeni svježi `add`, DON!! bez ID-a te redoslijed `FOR UPDATE → loan upit`.
+- SQLite/mock testovi ne dokazuju stvarno raspoređivanje paralelnih PostgreSQL transakcija; potrebni integracijski scenariji dokumentirani su u `docs/KORAK_11B2C_EXCEL_IMPORT.md`.
+- Dodano je devet regresijskih testova, uključujući HTTP tok `preview → promjena kolekcije → apply starim tokenom`; ciljana cjelina ima 61, puni suite 441 prolazni test, a Ruff provjere prolaze.
+
+### Korak 11B.2D — posudbe
+
+- Ponovno su provjereni vlasništvo, `lent`/`borrowed`, raspoloživost, filtri, detalji printinga, UTC datumi te djelomični i potpuni povrati.
+- Dodatno su provjereni zajednički limit više aktivnih posudbi, oslobađanje raspoloživosti nakon povrata, owner-scope stvarnog SQL upita i uzastopni povrati bez prekoračenja.
+- Potvrđeni su PostgreSQL `FOR UPDATE` upiti za vlasnički redak pri stvaranju i za loan redak pri povratu, uz redoslijed `owned_lock → outstanding`.
+- SQLite/mock testovi ne dokazuju stvarno blokiranje paralelnih PostgreSQL transakcija; obavezni scenariji za zasebnu trajnu testnu bazu dokumentirani su u `docs/KORAK_11B2D_POSUDBE.md`.
+- Dodano je sedam regresijskih testova; ciljana cjelina ima 116, puni suite 448 prolaznih testova, a Ruff provjere prolaze.
+
+### Korak 11B.3 — API rute, Swagger/OpenAPI i HTTP ugovor
+
+- Generirana OpenAPI shema uspoređena je sa svih 20 registriranih aplikacijskih operacija, njihovim metodama, parametrima, request/response modelima i statusnim kodovima.
+- Swagger sada razlikuje potpuno javne rute, privatne bearer rute i uvjetno autentificirani `GET /cards`; `Authorize` koristi JWT bearer access token.
+- Dokumentirani su kontrolirani odgovori `401`, `403`, `404`, `409`, `413` i `422`, uključujući stvarni oblik `validation_error` odgovora s poljima `code`, `message` i `errors`.
+- Excel preview/apply dobili su eksplicitne response modele, a dokumentirani su i `plan_token`, načini `replace`/`add`, osobni filtri, Counter opcije te vremenske zone posudbi.
+- Dodano je osam ciljnih OpenAPI testova; puni suite ima 456 prolaznih testova. Detalji: `docs/KORAK_11B3_OPENAPI_REVIZIJA.md`.
+
+Sljedeći obavezni korak je **11C**: zasebna trajna PostgreSQL testna baza bez osobnih podataka, automatsko postavljanje sheme te stvarni testovi paralelnih transakcija, zaključavanja i rollbacka prije PR-a u `main`.
+
+### Korak 11C.1 — izolirana PostgreSQL testna baza
+
+- Compose profil `test` dodaje servis `db_test` na `127.0.0.1:5434`, bazu `optcg_test`, korisnika `optcg_test_user` i zaseban volume `pgdata_test`; postojeći `db` na portu 5433 nije promijenjen.
+- PostgreSQL testovi čitaju isključivo eksplicitni `TEST_DATABASE_URL`, bez fallbacka na razvojni `DATABASE_URL`.
+- Prije migracije ili upisa provjeravaju se driver, host, port, korisnik i naziv iz URL-a; svi URL query parametri su zabranjeni. Na stvarnoj konekciji dodatno se provjeravaju naziv baze, korisnik, interni port, PostgreSQL verzija i `cluster_name=optcg_test_11c`.
+- Alembic u testnom načinu otvara eksplicitnu vanjsku transakciju te na istoj konekciji provjerava identitet i izvršava migracije. Uspjeh commitira cijeli blok, a pogreška ili nevaljan identitet uzrokuju rollback prije djelomične primjene; testne offline migracije nisu dopuštene.
+- `python -m app.prepare_test_database` primjenjuje postojeće Alembic migracije do `004 (head)` tek nakon sigurnosnih provjera.
+- Obični SQLite/mock testovi ne zahtijevaju Docker. PostgreSQL testovi imaju marker `postgres`; obični suite ih bez testne varijable preskače, dok eksplicitni režim `POSTGRES_TEST_REQUIRED=1` nedostajuću konfiguraciju ili nedostupnu bazu tretira kao failure.
+- Na lokalnom `db_test` potvrđen je ciklus migracija `004 → 003 → 004`. Nakon ponovnog upgradea prošla su sva tri početna PostgreSQL testa.
+- Nakon 11C.2 puni skup ima `502 passed`, uključujući 12 PostgreSQL testova.
+- Potpune naredbe i sigurnosni ugovor opisani su u `docs/KORAK_11C1_POSTGRES_TEST_BAZA.md`.

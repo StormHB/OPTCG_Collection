@@ -1,4 +1,5 @@
 """Korak 7: sve provjere rade lokalno na SQLiteu (bez mreže i korisničke baze)."""
+
 import asyncio
 import hashlib
 import json
@@ -8,18 +9,31 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.enrich_catalog import (
-    EnrichmentError, EnrichmentRow, _validate_file, enrich_rows,
-    load_snapshot, parse_enrichment, recognize_keywords,
+    EnrichmentError,
+    EnrichmentRow,
+    enrich_rows,
+    load_snapshot,
+    parse_enrichment,
+    recognize_keywords,
 )
 from app.models import (
-    Base, Archetype, Attribute, Card, CardPrinting, CardSet, CollectionEntry,
-    Color, Keyword, User,
+    Archetype,
+    Attribute,
+    Base,
+    Card,
+    CardPrinting,
+    CardSet,
+    CollectionEntry,
+    Color,
+    Keyword,
+    User,
 )
 from app.seed import ATTRIBUTES, COLORS, KEYWORDS
 
 
 class DbBridge:
     """Slično ostalim testovima projekta, AsyncSession adapter za SQLite."""
+
     def __init__(self, sync_session):
         self.session = sync_session
 
@@ -33,14 +47,24 @@ class DbBridge:
 def sample_jsonl():
     card = {"key": "card_example123", "number": "OP01-016", "category": "character"}
     obs = {
-        "key": "obs1", "card_key": "card_example123", "site": "en", "name": "Nami",
-        "category": "character", "colors": ["red"], "attributes": ["special"],
-        "types": ["Straw Hat Crew", "East Blue"], "cost": 1, "power": 2000,
-        "counter": 1000, "effect": "[On Play] Draw 1 card. [DON!! x1] [Your Turn] [Rush]",
+        "key": "obs1",
+        "card_key": "card_example123",
+        "site": "en",
+        "name": "Nami",
+        "category": "character",
+        "colors": ["red"],
+        "attributes": ["special"],
+        "types": ["Straw Hat Crew", "East Blue"],
+        "cost": 1,
+        "power": 2000,
+        "counter": 1000,
+        "effect": "[On Play] Draw 1 card. [DON!! x1] [Your Turn] [Rush]",
         "trigger": "[Trigger] Activate this card.",
     }
     printing = {
-        "key": "prt_one", "card_key": "card_example123", "variant": "base",
+        "key": "prt_one",
+        "card_key": "card_example123",
+        "variant": "base",
         "image_url": "https://en.onepiece-cardgame.com/images/cardlist/card/OP01-016.png",
         "block_icon": 1,
     }
@@ -65,15 +89,26 @@ def setup_db():
     s.add_all([op01, *[Color(name=n) for n in COLORS if n != "Red"], red])
     s.add_all(Attribute(name=n) for n in ATTRIBUTES)
     s.add_all(Keyword(name=n) for n in KEYWORDS)
-    card = Card(code="OP01-016", name="Nami", original_set=op01, colors=[red], color="Red")
-    p = CardPrinting(card=card, product_set=op01, variant_code="regular", rarity="R",
-                     image_url="https://en.onepiece-cardgame.com/images/cardlist/card/OP01-016.png")
+    card = Card(
+        code="OP01-016", name="Nami", original_set=op01, colors=[red], color="Red"
+    )
+    p = CardPrinting(
+        card=card,
+        product_set=op01,
+        variant_code="regular",
+        rarity="R",
+        image_url="https://en.onepiece-cardgame.com/images/cardlist/card/OP01-016.png",
+    )
     s.add(p)
     s.flush()
     user = User(username="collector", password_hash="hash", role="user")
     s.add(user)
     s.flush()
-    s.add(CollectionEntry(user_id=user.id, printing_id=p.id, quantity=3, note="Posebna napomena"))
+    s.add(
+        CollectionEntry(
+            user_id=user.id, printing_id=p.id, quantity=3, note="Posebna napomena"
+        )
+    )
     s.commit()
     return engine, s
 
@@ -88,7 +123,8 @@ def test_snapshot_validation_sha_and_count(tmp_path):
         target.write_bytes(body)
         files[name] = {"rows": len(rows), "sha256": hashlib.sha256(body).hexdigest()}
     (tmp_path / "manifest.json").write_text(
-        json.dumps({"generated_at": "2026-11-01T00:00:00Z", "files": files}), encoding="utf-8"
+        json.dumps({"generated_at": "2026-11-01T00:00:00Z", "files": files}),
+        encoding="utf-8",
     )
     result, date = load_snapshot(tmp_path)
     assert result == raw
@@ -124,16 +160,22 @@ def test_unnumbered_don_is_skipped_without_fake_id():
 
 def test_superseded_observation_is_not_used():
     sample = sample_jsonl()
-    sample["data/card_observations/en.jsonl"].append({
-        "card_key": "card_example123", "name": "Old name", "superseded_at": "2026-10-01T00:00:00Z"})
+    sample["data/card_observations/en.jsonl"].append(
+        {
+            "card_key": "card_example123",
+            "name": "Old name",
+            "superseded_at": "2026-10-01T00:00:00Z",
+        }
+    )
     rows, _ = parse_enrichment(sample)
     assert rows[0].name == "Nami"
 
 
 def test_duplicate_live_observations_fail_closed():
     sample = sample_jsonl()
-    sample["data/card_observations/en.jsonl"].append({
-        "card_key": "card_example123", "name": "Different current name"})
+    sample["data/card_observations/en.jsonl"].append(
+        {"card_key": "card_example123", "name": "Different current name"}
+    )
     with pytest.raises(EnrichmentError, match="Više aktivnih"):
         parse_enrichment(sample)
 
@@ -182,8 +224,13 @@ def test_apply_idempotency_and_personal_collection_unchanged():
         assert (collection.quantity, collection.note) == (3, "Posebna napomena")
         second = asyncio.run(enrich_rows(DbBridge(s), [one_row()], apply=True))
         s.commit()
-        assert (second.cards_updated, second.fields_filled, second.relations_added,
-                second.archetypes_created, second.block_icons_filled) == (0, 0, 0, 0, 0)
+        assert (
+            second.cards_updated,
+            second.fields_filled,
+            second.relations_added,
+            second.archetypes_created,
+            second.block_icons_filled,
+        ) == (0, 0, 0, 0, 0)
         assert s.scalars(select(CollectionEntry)).one().quantity == 3
     finally:
         s.close()
@@ -197,7 +244,9 @@ def test_does_not_replace_conflicting_existing_data_or_wrong_block_image():
         card.cost = 9
         s.commit()
         original = one_row()
-        changed_image = EnrichmentRow(**{**vars(original), "base_image_url": "https://example.com/a.png"})
+        changed_image = EnrichmentRow(
+            **{**vars(original), "base_image_url": "https://example.com/a.png"}
+        )
         result = asyncio.run(enrich_rows(DbBridge(s), [changed_image], apply=True))
         s.commit()
         assert result.conflicts >= 1

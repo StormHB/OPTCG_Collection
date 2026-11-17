@@ -1,10 +1,12 @@
 """Siguran lokalni uvoz osnovnog kataloga iz CSV-a nastalog iz našeg Excela.
 
-Pokretanje unutar api/: python -m app.import_catalog --file ../data/catalog_from_excel.csv
+Pokretanje unutar api/:
+    python -m app.import_catalog --file ../data/catalog_from_excel.csv
 Primjena: python -m app.import_catalog --file ../data/catalog_from_excel.csv --apply
 
 Namjerno NE uvozi korisničke količine, napomene, DON!! ni neprovjerene OP18 podatke.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -62,10 +64,16 @@ def read_catalog_csv(path: Path) -> list[CatalogRow]:
                 f"CSV zaglavlje mora biti: {', '.join(EXPECTED_COLUMNS)}"
             )
         for line_number, data in enumerate(reader, start=2):
-            if not any(value and value.strip() for value in data.values() if isinstance(value, str)):
+            if not any(
+                value and value.strip()
+                for value in data.values()
+                if isinstance(value, str)
+            ):
                 continue
             if None in data:
-                raise CatalogImportError(f"Red {line_number}: neočekivani dodatni stupci")
+                raise CatalogImportError(
+                    f"Red {line_number}: neočekivani dodatni stupci"
+                )
             set_code = (data["set_code"] or "").strip().upper()
             code = (data["card_code"] or "").strip().upper()
             name = (data["name"] or "").strip()
@@ -73,26 +81,42 @@ def read_catalog_csv(path: Path) -> list[CatalogRow]:
             color_string = (data["color"] or "").strip()
             image_url = (data["image_url"] or "").strip() or None
             if not SET_PATTERN.fullmatch(set_code):
-                raise CatalogImportError(f"Red {line_number}: nepoznata oznaka seta {set_code!r}")
+                raise CatalogImportError(
+                    f"Red {line_number}: nepoznata oznaka seta {set_code!r}"
+                )
             if not CARD_CODE_PATTERN.fullmatch(code):
-                raise CatalogImportError(f"Red {line_number}: neispravan broj karte {code!r}")
+                raise CatalogImportError(
+                    f"Red {line_number}: neispravan broj karte {code!r}"
+                )
             if not name or len(name) > 160:
                 raise CatalogImportError(f"Red {line_number}: neispravan naziv karte")
             if rarity not in RARITIES:
-                raise CatalogImportError(f"Red {line_number}: nepoznata rijetkost {rarity!r}")
+                raise CatalogImportError(
+                    f"Red {line_number}: nepoznata rijetkost {rarity!r}"
+                )
             if image_url:
                 url = urlsplit(image_url)
                 if url.scheme != "https" or not url.netloc or len(image_url) > 600:
-                    raise CatalogImportError(f"Red {line_number}: slika mora biti HTTPS URL")
-            colors = tuple(dict.fromkeys(p.strip().title() for p in color_string.split("/") if p.strip()))
+                    raise CatalogImportError(
+                        f"Red {line_number}: slika mora biti HTTPS URL"
+                    )
+            colors = tuple(
+                dict.fromkeys(
+                    p.strip().title() for p in color_string.split("/") if p.strip()
+                )
+            )
             if not colors or set(colors) - COLOR_NAMES:
-                raise CatalogImportError(f"Red {line_number}: neispravne boje {color_string!r}")
+                raise CatalogImportError(
+                    f"Red {line_number}: neispravne boje {color_string!r}"
+                )
             key = (set_code, code)
             if key in seen_printings:
                 raise CatalogImportError(f"Red {line_number}: ponovljeno izdanje {key}")
             seen_printings.add(key)
             if code in card_names and card_names[code] != name:
-                raise CatalogImportError(f"Red {line_number}: različita imena za {code}")
+                raise CatalogImportError(
+                    f"Red {line_number}: različita imena za {code}"
+                )
             if code in card_colors and set(card_colors[code]) != set(colors):
                 raise CatalogImportError(f"Red {line_number}: različite boje za {code}")
             card_names[code] = name
@@ -125,13 +149,16 @@ async def import_rows(db, rows: list[CatalogRow]) -> ImportResult:
     missing_colors = {c for r in rows for c in r.colors} - colors.keys()
     if missing_sets or missing_colors:
         raise CatalogImportError(
-            f"Nedostaju seed vrijednosti; setovi={sorted(missing_sets)}, boje={sorted(missing_colors)}. "
+            f"Nedostaju seed vrijednosti; setovi={sorted(missing_sets)}, "
+            f"boje={sorted(missing_colors)}. "
             "Pokreni prvo python -m app.seed"
         )
 
     cards = {
         c.code: c
-        for c in (await db.scalars(select(Card).options(selectinload(Card.colors)))).all()
+        for c in (
+            await db.scalars(select(Card).options(selectinload(Card.colors)))
+        ).all()
     }
     set_by_id = {s.id: s.code for s in sets.values()}
     card_by_id = {c.id: c.code for c in cards.values()}
@@ -162,7 +189,9 @@ async def import_rows(db, rows: list[CatalogRow]) -> ImportResult:
                 card.original_set_id is not None
                 and card.original_set_id != sets[row.original_set_code].id
             ):
-                raise CatalogImportError(f"Sukob s postojećom kartom {row.card_code} — uvoz prekinut")
+                raise CatalogImportError(
+                    f"Sukob s postojećom kartom {row.card_code} — uvoz prekinut"
+                )
             existing = {c.name for c in card.colors}
             for name in row.colors:
                 if name not in existing:
@@ -198,8 +227,15 @@ async def _run(path: Path, apply: bool) -> None:
     rows = read_catalog_csv(path)
     by_set = Counter(r.set_code for r in rows)
     unique_cards = len({r.card_code for r in rows})
-    print(f"CSV: {len(rows)} izdanja, {unique_cards} jedinstvenih karata, {len(by_set)} sheetova/setova")
-    print(f"Npr. OP01={by_set.get('OP01', 0)}, PRB01={by_set.get('PRB01', 0)}, PRB02={by_set.get('PRB02', 0)}")
+    print(
+        f"CSV: {len(rows)} izdanja, {unique_cards} jedinstvenih karata, "
+        f"{len(by_set)} sheetova/setova"
+    )
+    print(
+        f"Npr. OP01={by_set.get('OP01', 0)}, "
+        f"PRB01={by_set.get('PRB01', 0)}, "
+        f"PRB02={by_set.get('PRB02', 0)}"
+    )
     if not apply:
         print("SUHI POKUS: baza nije promijenjena. Za stvarni uvoz dodaj --apply.")
         return
@@ -218,9 +254,15 @@ async def _run(path: Path, apply: bool) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Import kataloga iz Excel-izvedenog CSV-a")
+    parser = argparse.ArgumentParser(
+        description="Import kataloga iz Excel-izvedenog CSV-a"
+    )
     parser.add_argument("--file", type=Path, required=True, help="putanja CSV datoteke")
-    parser.add_argument("--apply", action="store_true", help="primijeni sve promjene u jednoj DB transakciji")
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="primijeni sve promjene u jednoj DB transakciji",
+    )
     args = parser.parse_args()
     try:
         asyncio.run(_run(args.file, args.apply))

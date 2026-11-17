@@ -1,14 +1,28 @@
 """Jedinstveni kartični identitet (npr. OP01-001), neovisno o ilustraciji."""
+
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.models.card_metadata import (
-    Archetype, Attribute, Color, Keyword,
-    card_archetypes, card_attributes, card_colors, card_keywords,
+    Archetype,
+    Attribute,
+    Color,
+    Keyword,
+    card_archetypes,
+    card_attributes,
+    card_colors,
+    card_keywords,
 )
+
+if TYPE_CHECKING:
+    from app.models.card_printing import CardPrinting
+    from app.models.card_set import CardSet
+
 
 class Card(Base):
     __tablename__ = "cards"

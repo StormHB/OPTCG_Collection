@@ -13,22 +13,41 @@ def validate_bcrypt_length(value: str) -> str:
 
 
 Password = Annotated[str, Field(min_length=1), AfterValidator(validate_bcrypt_length)]
-NewPassword = Annotated[str, Field(min_length=8), AfterValidator(validate_bcrypt_length)]
+NewPassword = Annotated[
+    str, Field(min_length=8), AfterValidator(validate_bcrypt_length)
+]
 
 
 class RegisterRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {"username": "luffy_01", "password": "sigurna-lozinka"}
+        },
+    )
 
     username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9_]+$")
     password: NewPassword
 
 
 class LoginRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {"username": "luffy_01", "password": "sigurna-lozinka"}
+        },
+    )
+
     username: str = Field(min_length=1, max_length=80)
     password: Password
 
 
 class RefreshRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"example": {"refresh_token": "<refresh-token>"}},
+    )
+
     refresh_token: str = Field(min_length=1)
 
 

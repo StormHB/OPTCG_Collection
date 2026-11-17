@@ -69,7 +69,7 @@ def test_counter_null_is_distinct_from_numerical_zero():
         values["counter_values"] = [0, 2000]
         repo.return_value = values
         data = _client().get("/cards/filters").json()
-        assert data["counter_values"] == [None, 0, 1000, 2000]
+        assert data["counter_values"] == [0, 1000, 2000]
 
 
 def test_sets_and_archetypes_are_loaded_from_database():
@@ -88,7 +88,14 @@ def test_sets_and_archetypes_are_loaded_from_database():
 def test_empty_catalog_still_has_stable_categories():
     with patch.object(card_repo, "get_filter_values", new_callable=AsyncMock) as repo:
         values = _values()
-        for field in ("costs", "powers", "card_types", "rarities", "variants", "block_icons"):
+        for field in (
+            "costs",
+            "powers",
+            "card_types",
+            "rarities",
+            "variants",
+            "block_icons",
+        ):
             values[field] = []
         repo.return_value = values
         data = _client().get("/cards/filters").json()

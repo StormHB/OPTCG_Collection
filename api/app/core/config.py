@@ -14,9 +14,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_ISSUER: str = "optcg-collection"
 
-    model_config = SettingsConfigDict(
-        env_file=ENV_FILE,
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
+
 
 settings = Settings()

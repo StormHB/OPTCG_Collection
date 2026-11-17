@@ -44,12 +44,7 @@ async def get_by_id_with_details(db: AsyncSession, card_id: int) -> Card | None:
 
 async def _distinct_values(db: AsyncSession, column) -> list:
     """Vrati jedinstvene, ne-NULL vrijednosti jednog stupca."""
-    statement = (
-        select(column)
-        .where(column.is_not(None))
-        .distinct()
-        .order_by(column)
-    )
+    statement = select(column).where(column.is_not(None)).distinct().order_by(column)
     return list((await db.scalars(statement)).all())
 
 
@@ -213,7 +208,8 @@ async def list_filtered(
             ]
             if full_playset:
                 requirements.append(
-                    CollectionEntry.quantity >= playset_threshold_sql(
+                    CollectionEntry.quantity
+                    >= playset_threshold_sql(
                         Card.card_type,
                         rarity=CardPrinting.rarity,
                         set_code=CardSet.code,
@@ -264,15 +260,10 @@ async def list_filtered(
         text_checks = []
         for text in search_terms:
             # '%' i '_' iz korisničkog teksta nisu SQL wildcards.
-            escaped = (
-                text.replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_")
-            )
+            escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             term = f"%{escaped}%"
             text_checks.extend(
-                [Card.code.ilike(term, escape="\\"),
-                 Card.name.ilike(term, escape="\\")]
+                [Card.code.ilike(term, escape="\\"), Card.name.ilike(term, escape="\\")]
             )
         conditions.append(or_(*text_checks))
 

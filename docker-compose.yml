@@ -10,5 +10,24 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  db_test:
+    image: postgres:16
+    profiles: ["test"]
+    command: ["postgres", "-c", "cluster_name=optcg_test_11c"]
+    environment:
+      POSTGRES_DB: optcg_test
+      POSTGRES_USER: optcg_test_user
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:-local_optcg_test_only_change_me}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - pgdata_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U optcg_test_user -d optcg_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
 volumes:
   pgdata:
+  pgdata_test:

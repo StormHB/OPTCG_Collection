@@ -1,6 +1,6 @@
 """Pydantic sheme za osobnu kolekciju (čitanje, unos i izmjene)."""
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class CollectionEntryResponse(BaseModel):
@@ -17,16 +17,42 @@ class CollectionEntryResponse(BaseModel):
 class CollectionEntryCreate(BaseModel):
     """Za novu stavku navodimo točno fizičko izdanje i njegovu količinu."""
 
-    printing_id: int = Field(ge=1)
-    quantity: int = Field(ge=0, le=999_999)
-    note: str | None = Field(default=None, max_length=1000)
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {"printing_id": 13, "quantity": 4, "note": "Za deck"}
+        },
+    )
+
+    printing_id: int = Field(strict=True, ge=1)
+    quantity: int = Field(strict=True, ge=0, le=999_999)
+    note: str | None = Field(default=None, strict=True, max_length=1000)
+
+    @field_validator("note")
+    @classmethod
+    def note_cannot_be_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Napomena ne smije biti prazna; koristi null za brisanje")
+        return value
 
 
 class CollectionEntryUpdate(BaseModel):
     """PATCH ažurira samo navedena polja. note=null briše napomenu."""
 
-    quantity: int | None = Field(default=None, ge=0, le=999_999)
-    note: str | None = Field(default=None, max_length=1000)
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"example": {"quantity": 4, "note": None}},
+    )
+
+    quantity: int | None = Field(default=None, strict=True, ge=0, le=999_999)
+    note: str | None = Field(default=None, strict=True, max_length=1000)
+
+    @field_validator("note")
+    @classmethod
+    def note_cannot_be_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Napomena ne smije biti prazna; koristi null za brisanje")
+        return value
 
     @model_validator(mode="after")
     def validate_changes(self) -> "CollectionEntryUpdate":

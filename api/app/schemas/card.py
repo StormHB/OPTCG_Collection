@@ -26,6 +26,7 @@ class CardPageResponse(BaseModel):
 
 class CardPrintingResponse(BaseModel):
     """Jedna fizička verzija karte (regular, alt, manga ili reprint)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -38,6 +39,7 @@ class CardPrintingResponse(BaseModel):
 
 class CardDetailResponse(CardSummaryResponse):
     """Detalji osnovne karte sa svim pripadnostima i izdanjima."""
+
     color: str | None = None  # Privremeni tekstualni stupac; stari uvozi.
     attribute: str | None = None
     affiliation_text: str | None = None
@@ -51,6 +53,7 @@ class CardDetailResponse(CardSummaryResponse):
 
 class CardSetFilterOption(BaseModel):
     """Set može biti izvorni set karte ili set u kojem se nalazi reprint."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -60,12 +63,13 @@ class CardSetFilterOption(BaseModel):
 
 class CardFilterOptionsResponse(BaseModel):
     """Opcije za Vue dropdownove, bez korisničkih podataka."""
+
     colors: list[str]
     card_types: list[str]
     costs: list[int]
     powers: list[int]
     attributes: list[str]
-    counter_values: list[int | None]  # NULL = nema tiskane Counter vrijednosti.
+    counter_values: list[int]  # Bez NULL-a; koristi se counter_missing=true.
     block_icons: list[str]
     keywords: list[str]
     archetypes: list[str]

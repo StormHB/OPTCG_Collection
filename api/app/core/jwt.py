@@ -1,10 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from jwt import ExpiredSignatureError, InvalidTokenError
 
 from app.core.config import settings
-
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
@@ -22,11 +20,7 @@ def create_access_token(user_id: int, role: str) -> str:
         "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     }
 
-    return jwt.encode(
-        payload,
-        settings.JWT_SECRET,
-        algorithm=ALGORITHM
-    )
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=ALGORITHM)
 
 
 def create_refresh_token(user_id: int) -> str:
@@ -39,11 +33,7 @@ def create_refresh_token(user_id: int) -> str:
         "exp": now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
     }
 
-    return jwt.encode(
-        payload,
-        settings.JWT_SECRET,
-        algorithm=ALGORITHM
-    )
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=ALGORITHM)
 
 
 def decode_token(token: str) -> dict:
@@ -52,7 +42,5 @@ def decode_token(token: str) -> dict:
         settings.JWT_SECRET,
         algorithms=[ALGORITHM],
         issuer=settings.JWT_ISSUER,
-        options={
-            "require": ["exp", "sub", "iss", "type"]
-        }
+        options={"require": ["exp", "sub", "iss", "type"]},
     )

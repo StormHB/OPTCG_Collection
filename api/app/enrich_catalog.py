@@ -11,6 +11,7 @@ Komande, pokretati iz api/:
 Namjerno ne stvara nove karte ili izdanja, ne mijenja korisničke kolekcije,
 ne prepisuje postojeće vrijednosti i nikad ne preuzima slike na naš server.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,7 +43,12 @@ SOURCE_FILES = (
 )
 DEFAULT_SNAPSHOT = Path(__file__).resolve().parents[2] / "data" / "koala_snapshot"
 CODE = re.compile(r"^(?:(?:OP|EB|ST|PRB)\d{2}|P)-\d{3}$", re.I)
-VALID_TYPES = {"leader": "Leader", "character": "Character", "event": "Event", "stage": "Stage"}
+VALID_TYPES = {
+    "leader": "Leader",
+    "character": "Character",
+    "event": "Event",
+    "stage": "Stage",
+}
 VALID_COLORS = {"red", "green", "blue", "purple", "black", "yellow"}
 VALID_ATTRIBUTES = {"slash", "strike", "ranged", "special", "wisdom", "?"}
 
@@ -119,7 +125,11 @@ def load_snapshot(folder: Path) -> tuple[dict[str, list[dict]], str]:
         try:
             content = file_path.read_bytes()
             _validate_file(content, manifest["files"][name], name)
-            lines = [line for line in content.decode("utf-8-sig").splitlines() if line.strip()]
+            lines = [
+                line
+                for line in content.decode("utf-8-sig").splitlines()
+                if line.strip()
+            ]
             rows = [json.loads(line) for line in lines]
             if not all(isinstance(row, dict) for row in rows):
                 raise EnrichmentError(f"Nevaljan JSON objekt u {name}")
@@ -184,7 +194,10 @@ def recognize_keywords(effect: str, trigger: str) -> tuple[str, ...]:
     '[Counter]' nije isto što i numerički Counter od +1000/+2000.
     """
     text = f"{effect}\n{trigger}"
-    labels = [re.sub(r"\s+", " ", item.strip()).casefold() for item in re.findall(r"\[([^]]+)\]", text)]
+    labels = [
+        re.sub(r"\s+", " ", item.strip()).casefold()
+        for item in re.findall(r"\[([^]]+)\]", text)
+    ]
     result = set()
     for name in KEYWORDS:
         low = name.casefold()
@@ -226,7 +239,9 @@ class EnrichmentRow:
     block_icon: str | None = None
 
 
-def parse_enrichment(raw: dict[str, list[dict]]) -> tuple[list[EnrichmentRow], dict[str, int]]:
+def parse_enrichment(
+    raw: dict[str, list[dict]],
+) -> tuple[list[EnrichmentRow], dict[str, int]]:
     cards = raw["data/cards.jsonl"]
     observations = raw["data/card_observations/en.jsonl"]
     printings = raw["data/printings/en.jsonl"]
@@ -265,8 +280,12 @@ def parse_enrichment(raw: dict[str, list[dict]]) -> tuple[list[EnrichmentRow], d
             base_images.setdefault(card_key, []).append(printing)
 
     records: list[EnrichmentRow] = []
-    stats = {"koala_cards": len(cards), "en_observations": len(current), "without_en": 0,
-             "unnumbered_or_don": 0}
+    stats = {
+        "koala_cards": len(cards),
+        "en_observations": len(current),
+        "without_en": 0,
+        "unnumbered_or_don": 0,
+    }
     for key, card in by_key.items():
         code = card.get("number")
         if not isinstance(code, str) or not CODE.fullmatch(code.upper()):
@@ -289,8 +308,10 @@ def parse_enrichment(raw: dict[str, list[dict]]) -> tuple[list[EnrichmentRow], d
         colors = tuple(v.title() for v in _values(_first(obs, card, "colors")))
         if any(color.casefold() not in VALID_COLORS for color in colors):
             raise EnrichmentError(f"{code}: nepoznate boje {colors}")
-        attributes = tuple("?" if v in {"?", "？"} else v.title()
-                           for v in _values(_first(obs, card, "attributes")))
+        attributes = tuple(
+            "?" if v in {"?", "？"} else v.title()
+            for v in _values(_first(obs, card, "attributes"))
+        )
         if any(attr.casefold() not in VALID_ATTRIBUTES for attr in attributes):
             raise EnrichmentError(f"{code}: nepoznati atributi {attributes}")
         archetypes = _values(_first(obs, card, "types"))
@@ -311,13 +332,24 @@ def parse_enrichment(raw: dict[str, list[dict]]) -> tuple[list[EnrichmentRow], d
         if len(matched_base) == 1:
             base_image_url = matched_base[0].get("image_url")
             block_icon = _norm_block(matched_base[0].get("block_icon"))
-        records.append(EnrichmentRow(
-            code=code, name=name.strip(), category=category,
-            cost=cost, power=power, counter=counter, life=life,
-            colors=colors, attributes=attributes, archetypes=archetypes,
-            keywords=keywords, effect_text=joined or None,
-            base_image_url=base_image_url, block_icon=block_icon,
-        ))
+        records.append(
+            EnrichmentRow(
+                code=code,
+                name=name.strip(),
+                category=category,
+                cost=cost,
+                power=power,
+                counter=counter,
+                life=life,
+                colors=colors,
+                attributes=attributes,
+                archetypes=archetypes,
+                keywords=keywords,
+                effect_text=joined or None,
+                base_image_url=base_image_url,
+                block_icon=block_icon,
+            )
+        )
     return records, stats
 
 
@@ -339,18 +371,30 @@ class EnrichmentResult:
             self.examples.append(message)
 
 
-async def enrich_rows(db, rows: list[EnrichmentRow], *, apply: bool) -> EnrichmentResult:
+async def enrich_rows(
+    db, rows: list[EnrichmentRow], *, apply: bool
+) -> EnrichmentResult:
     """Fill-only, ponovljiv postupak. `apply=False` je read-only DB pregled."""
-    loaded = (await db.scalars(select(Card).options(
-        selectinload(Card.colors), selectinload(Card.attributes),
-        selectinload(Card.archetypes), selectinload(Card.keywords),
-        selectinload(Card.printings),
-    ))).all()
+    loaded = (
+        await db.scalars(
+            select(Card).options(
+                selectinload(Card.colors),
+                selectinload(Card.attributes),
+                selectinload(Card.archetypes),
+                selectinload(Card.keywords),
+                selectinload(Card.printings),
+            )
+        )
+    ).all()
     cards_by_code = {card.code.upper(): card for card in loaded}
     colors = {c.name.casefold(): c for c in (await db.scalars(select(Color))).all()}
-    attributes = {a.name.casefold(): a for a in (await db.scalars(select(Attribute))).all()}
+    attributes = {
+        a.name.casefold(): a for a in (await db.scalars(select(Attribute))).all()
+    }
     keywords = {k.name.casefold(): k for k in (await db.scalars(select(Keyword))).all()}
-    archetypes = {a.name.casefold(): a for a in (await db.scalars(select(Archetype))).all()}
+    archetypes = {
+        a.name.casefold(): a for a in (await db.scalars(select(Archetype))).all()
+    }
     unknown_archetypes: set[str] = set()
     result = EnrichmentResult()
 
@@ -362,9 +406,12 @@ async def enrich_rows(db, rows: list[EnrichmentRow], *, apply: bool) -> Enrichme
         result.matched += 1
         touched = False
         for attr, incoming in (
-            ("card_type", row.category), ("cost", row.cost),
-            ("power", row.power), ("counter", row.counter),
-            ("life", row.life), ("effect_text", row.effect_text),
+            ("card_type", row.category),
+            ("cost", row.cost),
+            ("power", row.power),
+            ("counter", row.counter),
+            ("life", row.life),
+            ("effect_text", row.effect_text),
         ):
             if incoming is None:
                 continue
@@ -375,13 +422,26 @@ async def enrich_rows(db, rows: list[EnrichmentRow], *, apply: bool) -> Enrichme
                 result.fields_filled += 1
                 touched = True
             elif current != incoming:
-                result.warn(f"{row.code} {attr}: baza={str(current)[:40]!r}, izvor={str(incoming)[:40]!r}")
+                result.warn(
+                    f"{row.code} {attr}: "
+                    f"baza={str(current)[:40]!r}, izvor={str(incoming)[:40]!r}"
+                )
 
-        def link_values(field_name: str, incoming: tuple[str, ...], directory: dict, *, allow_new=False):
+        def link_values(
+            field_name: str,
+            incoming: tuple[str, ...],
+            directory: dict,
+            *,
+            allow_new=False,
+        ):
             nonlocal touched
             current_list = getattr(card, field_name)
             existing = {item.name.casefold() for item in current_list}
-            if field_name == "colors" and existing and set(s.casefold() for s in incoming) != existing:
+            if (
+                field_name == "colors"
+                and existing
+                and set(s.casefold() for s in incoming) != existing
+            ):
                 if incoming:
                     result.warn(f"{row.code} colors: ne podudaraju se CSV i izvor")
                 return
@@ -416,7 +476,9 @@ async def enrich_rows(db, rows: list[EnrichmentRow], *, apply: bool) -> Enrichme
                 card.attribute = "/".join(row.attributes)
             result.fields_filled += 1
             touched = True
-        if row.archetypes and (card.affiliation_text is None or card.affiliation_text == ""):
+        if row.archetypes and (
+            card.affiliation_text is None or card.affiliation_text == ""
+        ):
             if apply:
                 card.affiliation_text = "/".join(row.archetypes)
             result.fields_filled += 1
@@ -427,16 +489,21 @@ async def enrich_rows(db, rows: list[EnrichmentRow], *, apply: bool) -> Enrichme
         if row.block_icon is not None and row.base_image_url:
             source_image = _image_key(row.base_image_url)
             for printing in card.printings:
-                if (printing.product_set_id == card.original_set_id
-                        and printing.variant_code == "regular"
-                        and _image_key(printing.image_url) == source_image):
+                if (
+                    printing.product_set_id == card.original_set_id
+                    and printing.variant_code == "regular"
+                    and _image_key(printing.image_url) == source_image
+                ):
                     if printing.block_icon is None:
                         if apply:
                             printing.block_icon = row.block_icon
                         result.block_icons_filled += 1
                         touched = True
                     elif printing.block_icon != row.block_icon:
-                        result.warn(f"{row.code} block_icon: postojeće izdanje ima drukčiji blok")
+                        result.warn(
+                            f"{row.code} block_icon: "
+                            "postojeće izdanje ima drukčiji blok"
+                        )
         if touched:
             result.cards_updated += 1
     return result
@@ -448,9 +515,14 @@ async def _run(folder: Path, apply: bool) -> None:
     source, date = load_snapshot(folder)
     rows, info = parse_enrichment(source)
     print(f"Koala snapshot: {date}")
-    print(f"Izvor: {info['koala_cards']} karata; {info['en_observations']} aktivnih EN opisa")
-    print(f"Obrada: {len(rows)} numeriranih EN karata; ",
-          f"bez EN opisa={info['without_en']}; bez broja/DON={info['unnumbered_or_don']}")
+    print(
+        f"Izvor: {info['koala_cards']} karata; "
+        f"{info['en_observations']} aktivnih EN opisa"
+    )
+    print(
+        f"Obrada: {len(rows)} numeriranih EN karata; ",
+        f"bez EN opisa={info['without_en']}; bez broja/DON={info['unnumbered_or_don']}",
+    )
     async with AsyncSessionLocal() as session:
         if apply:
             async with session.begin():
@@ -462,8 +534,10 @@ async def _run(folder: Path, apply: bool) -> None:
         f"karte za dopunu={result.cards_updated}"
     )
     print(
-        f"Polja za dopunu={result.fields_filled}, nove M:N veze={result.relations_added}, "
-        f"novi archetypeovi={result.archetypes_created}, blok ikone={result.block_icons_filled}"
+        f"Polja za dopunu={result.fields_filled}, "
+        f"nove M:N veze={result.relations_added}, "
+        f"novi archetypeovi={result.archetypes_created}, "
+        f"blok ikone={result.block_icons_filled}"
     )
     if result.conflicts:
         print(f"Upozorenja / neslaganja={result.conflicts}; prva primjera:")
@@ -477,8 +551,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Dopuna Koala Kollect metapodataka")
     parser.add_argument("--snapshot-dir", type=Path, default=DEFAULT_SNAPSHOT)
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--download", action="store_true", help="preuzmi i provjeri JSONL snapshot")
-    group.add_argument("--apply", action="store_true", help="upiši promjene u jednoj transakciji")
+    group.add_argument(
+        "--download", action="store_true", help="preuzmi i provjeri JSONL snapshot"
+    )
+    group.add_argument(
+        "--apply", action="store_true", help="upiši promjene u jednoj transakciji"
+    )
     args = parser.parse_args()
     try:
         if args.download:
